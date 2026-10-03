@@ -7,7 +7,9 @@ echo   正在啟動 Flask Hello World 一頁式網站...
 echo ==============================================
 echo.
 
-if exist "C:\SoftWare\Anaconda\python.exe" (
+if exist "%~dp0.venv\Scripts\python.exe" (
+    "%~dp0.venv\Scripts\python.exe" app.py
+) else if exist "C:\SoftWare\Anaconda\python.exe" (
     "C:\SoftWare\Anaconda\python.exe" app.py
 ) else (
     python app.py
