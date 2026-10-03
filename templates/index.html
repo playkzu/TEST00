@@ -3,199 +3,689 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World - Flask 單頁網站</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+    <title>保量建設 BAOLIANG ARCHITECTURE | 淬鍊極致・築見傳世名邸</title>
+    <meta name="description" content="保量建設致力於頂級豪宅、傳世莊園與商務地標的精工營造，融合國際建築美學與航太級制震工藝，為層峰人士構築無可取代的尊榮生活。">
+    <meta property="og:title" content="保量建設 BAOLIANG ARCHITECTURE | 頂級名邸">
+    <meta property="og:description" content="淬鍊極致，築見傳世名邸。即刻線上預約尊榮私人鑑賞。">
+    <meta property="og:image" content="/static/images/hero-building.jpg">
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            color: #2d3748;
-        }
+    <!-- 頂級襯線與無襯線字體引入 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Noto+Serif+TC:wght@400;500;600;700;900&family=Noto+Sans+TC:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-        .card {
-            background: #ffffff;
-            border-radius: 18px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-            max-width: 520px;
-            width: 100%;
-            padding: 40px;
-            text-align: center;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 24px 50px rgba(0, 0, 0, 0.2);
-        }
-
-        .badge {
-            display: inline-block;
-            background-color: #e9d8fd;
-            color: #6b46c1;
-            font-weight: 600;
-            font-size: 0.85rem;
-            padding: 4px 12px;
-            border-radius: 9999px;
-            margin-bottom: 16px;
-            letter-spacing: 0.5px;
-        }
-
-        h1 {
-            font-size: 2.4rem;
-            color: #1a202c;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-        }
-
-        p.subtitle {
-            font-size: 1.05rem;
-            color: #718096;
-            margin-bottom: 28px;
-            line-height: 1.6;
-        }
-
-        .info-box {
-            background-color: #f7fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 16px;
-            margin-bottom: 24px;
-            font-size: 0.95rem;
-            color: #4a5568;
-            text-align: left;
-        }
-
-        .info-box p {
-            flex-wrap: wrap;
-            gap: 8px;
-            margin: 6px 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .info-label {
-            font-weight: 600;
-            color: #4a5568;
-        }
-
-        .info-value {
-            font-family: Consolas, Monaco, monospace;
-            background: #edf2f7;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-size: 0.88rem;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-        }
-
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
-            border: none;
-            border-radius: 10px;
-            padding: 12px 24px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s ease, transform 0.1s ease;
-            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
-        }
-
-        button:hover {
-            opacity: 0.92;
-        }
-
-        button:active {
-            transform: scale(0.98);
-        }
-
-        #api-response {
-            margin-top: 20px;
-            padding: 12px;
-            background-color: #e6fffa;
-            border: 1px solid #b2f5ea;
-            border-radius: 8px;
-            color: #234e52;
-            font-size: 0.95rem;
-            display: none;
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        footer {
-            margin-top: 30px;
-            font-size: 0.8rem;
-            color: #a0aec0;
-        }
-    </style>
+    <!-- 頂級黑曜金奢華樣式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/luxury.css') }}">
 </head>
 <body>
-    <main class="card">
-        <span class="badge">Python Flask 3.x</span>
-        <h1>Hello, World!</h1>
-        <p class="subtitle">歡迎來到您的第一個 Flask 一頁式網站！本頁面由 Flask 後端伺服器動態渲染而成。</p>
 
-        <div class="info-box">
-            <p><span class="info-label">伺服器狀態</span> <span class="info-value" style="color:#38a169;">● 正常運作中</span></p>
-            <p><span class="info-label">後端框架</span> <span class="info-value">Flask / Jinja2</span></p>
-            <p><span class="info-label">首次加載時間</span> <span class="info-value" id="load-time">{{ current_time }}</span></p>
+    <!-- ==========================================
+         頂級導覽列 (Site Header)
+         ========================================== -->
+    <header class="site-header" role="banner">
+        <div class="container nav-inner">
+            <!-- 品牌 Logo -->
+            <a href="#hero" class="brand-logo" aria-label="保量建設首頁">
+                <div class="logo-symbol"></div>
+                <div class="logo-text">
+                    <span class="logo-name">保量建設</span>
+                    <span class="logo-sub">BAOLIANG ARCHITECTURE</span>
+                </div>
+            </a>
+
+            <!-- 導覽連結 -->
+            <nav class="nav-menu" role="navigation" aria-label="主要導覽">
+                <ul class="nav-links">
+                    <li><a href="#hero" class="nav-link">首頁形象</a></li>
+                    <li><a href="#philosophy" class="nav-link">建築美學</a></li>
+                    <li><a href="#projects" class="nav-link">經典建案</a></li>
+                    <li><a href="#craftsmanship" class="nav-link">結構工法</a></li>
+                    <li><a href="#booking" class="nav-link">預約鑑賞</a></li>
+                    <li><a href="#testimonials" class="nav-link">名邸見證</a></li>
+                </ul>
+            </nav>
+
+            <!-- 導覽列操作按鈕 -->
+            <div class="nav-actions">
+                <a href="#booking" class="btn-gold" id="headerCtaBtn">
+                    <span>VIP 預約鑑賞</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </a>
+                <button class="menu-toggle" aria-label="展開導覽選單" aria-expanded="false">
+                    ☰
+                </button>
+            </div>
         </div>
+    </header>
 
-        <div class="btn-group">
-            <button onclick="fetchGreeting()">與後端互動打招呼</button>
-        </div>
+    <main id="main-content">
+        <!-- ==========================================
+             首頁核心大圖視覺區 (Hero Section)
+             ========================================== -->
+        <section id="hero" class="hero-section" aria-label="首頁主要視覺">
+            <div class="hero-bg">
+                <img src="{{ url_for('static', filename='images/hero-building.jpg') }}" alt="保量建設頂級豪宅建築景觀" fetchpriority="high">
+            </div>
+            <div class="hero-overlay"></div>
 
-        <div id="api-response" role="status" aria-live="polite"></div>
+            <div class="container hero-content">
+                <div class="hero-badge">
+                    <span class="hero-badge-dot"></span>
+                    <span class="hero-badge-text">2026 ARCHITECTURAL MASTERPIECE</span>
+                </div>
 
-        <footer>
-            Built with ❤️ using Python & Flask
-        </footer>
+                <h1 class="hero-title">
+                    淬鍊極致<br>
+                    <span class="gold-text">築見傳世名邸</span>
+                </h1>
+
+                <p class="hero-desc">
+                    以極致匠心雕琢每一寸空間，結合自然光影與現代建築美學。我們在最珍罕的土地上，為時代領袖打造歷久彌新的家族傳世資產。
+                </p>
+
+                <div class="hero-btn-group">
+                    <a href="#projects" class="btn-gold">
+                        <span>探索熱銷建案</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </a>
+                    <a href="#booking" class="btn-outline-gold">
+                        <span>預約私人鑑賞</span>
+                    </a>
+                </div>
+
+                <!-- 核心營造指標 -->
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-num">35<small>+</small></div>
+                        <div class="stat-label">年 匠心營造歷程</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-num">100<small>%</small></div>
+                        <div class="stat-label">國家級制震抗震標章</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-num">18<small>座</small></div>
+                        <div class="stat-label">國際建築金獎認證</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-num">3,200<small>+</small></div>
+                        <div class="stat-label">層峰家族幸福見證</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             品牌哲學與四大工藝核心 (Philosophy Section)
+             ========================================== -->
+        <section id="philosophy" class="philosophy-section">
+            <div class="container">
+                <div class="text-center">
+                    <span class="section-tag">ARCHITECTURAL PHILOSOPHY</span>
+                    <h2 class="section-title">四維精工・定義奢華新典範</h2>
+                    <p class="section-desc">我們深信建築不僅是鋼筋與石材的堆疊，更是承載世代記憶與生活哲學的藝術殿堂。</p>
+                </div>
+
+                <div class="philosophy-grid">
+                    <article class="philosophy-card">
+                        <div class="philosophy-num">01 / PRIME LOCATION</div>
+                        <svg class="philosophy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <circle cx="12" cy="10" r="3"></circle>
+                            <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path>
+                        </svg>
+                        <h3 class="philosophy-title">萬中選一珍罕地段</h3>
+                        <p class="philosophy-text">深耕一級核心都會精華區，嚴選正對森林公園、林蔭大道首排等不可複製之絕版地標。</p>
+                    </article>
+
+                    <article class="philosophy-card">
+                        <div class="philosophy-num">02 / MASTER DESIGN</div>
+                        <svg class="philosophy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                        <h3 class="philosophy-title">國際大師聯手雕琢</h3>
+                        <p class="philosophy-text">邀集普立茲克得獎大師、日本景觀名家與義大利燈光團隊，打造具備國際視野的美學建築。</p>
+                    </article>
+
+                    <article class="philosophy-card">
+                        <div class="philosophy-num">03 / ADVANCED ENGINEERING</div>
+                        <svg class="philosophy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        <h3 class="philosophy-title">航太級制震與精工</h3>
+                        <p class="philosophy-text">全面引進日本住友阻尼器制震工法與高強度耐震鋼骨，為百年家業築起固若金湯的安心基石。</p>
+                    </article>
+
+                    <article class="philosophy-card">
+                        <div class="philosophy-num">04 / BESPOKE PRIVILEGE</div>
+                        <svg class="philosophy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <h3 class="philosophy-title">瑞士級頂級私宅禮遇</h3>
+                        <p class="philosophy-text">比照國際五星級四季酒店管家服務標準，提供專屬秘書、私廚宴會廳與 24 小時智慧維安。</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             經典建案與熱銷名邸 (Featured Projects Section)
+             ========================================== -->
+        <section id="projects" class="projects-section">
+            <div class="container">
+                <div class="text-center">
+                    <span class="section-tag">MASTERPIECE PORTFOLIO</span>
+                    <h2 class="section-title">經典・熱銷建案巡禮</h2>
+                    <p class="section-desc">每一棟作品皆是城市天際線上的璀璨地標，兼備居住舒適度與世代傳承資產價值。</p>
+                </div>
+
+                <!-- 分類篩選按鈕 -->
+                <div class="filter-tabs" role="tablist">
+                    <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">全部建案 ({{ total_projects }})</button>
+                    <button class="filter-btn" data-filter="residence" role="tab" aria-selected="false">豪宅名邸</button>
+                    <button class="filter-btn" data-filter="villa" role="tab" aria-selected="false">景觀名墅</button>
+                    <button class="filter-btn" data-filter="commercial" role="tab" aria-selected="false">商務地標</button>
+                </div>
+
+                <!-- 建案列表 -->
+                <div class="projects-grid">
+                    {% for p in projects %}
+                    <article class="project-card" data-category="{{ p.category }}"
+                             data-location="{{ p.location }}"
+                             data-specs="{{ p.specs }}"
+                             data-architect="{{ p.architect }}">
+                        <div class="project-img-wrap">
+                            <span class="project-badge {{ p.badge_class }}">{{ p.status }}</span>
+                            <span class="project-tag">{{ p.tag }}</span>
+                            <img class="project-img" src="{{ p.image }}" alt="{{ p.name }}" loading="lazy">
+                        </div>
+                        <div class="project-body">
+                            <div class="project-sub">{{ p.subtitle }}</div>
+                            <h3 class="project-name">{{ p.name }}</h3>
+                            <p class="project-desc">{{ p.description }}</p>
+                            
+                            <div class="project-specs">
+                                <div class="spec-line">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                        <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path>
+                                    </svg>
+                                    <span>基地：{{ p.location }}</span>
+                                </div>
+                                <div class="spec-line">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                                        <line x1="9" y1="21" x2="9" y2="9"></line>
+                                    </svg>
+                                    <span>規格：{{ p.specs }}</span>
+                                </div>
+                            </div>
+
+                            <div class="project-actions">
+                                <button type="button" class="btn-outline-gold btn-quick-view">
+                                    <span>建案詳情</span>
+                                </button>
+                                <button type="button" class="btn-gold" onclick="selectProjectInForm('{{ p.name }}')">
+                                    <span>預約賞屋</span>
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             頂級工法與結構工程 (Craftsmanship & Safety)
+             ========================================== -->
+        <section id="craftsmanship" class="craft-section">
+            <div class="container">
+                <div class="text-center">
+                    <span class="section-tag">ENGINEERING INTEGRITY</span>
+                    <h2 class="section-title">看不見的細節・更是真功夫</h2>
+                    <p class="section-desc">以超越國家標準的嚴苛營造工法，守護您最摯愛的家人與傳承數代的榮耀。</p>
+                </div>
+
+                <div class="craft-grid">
+                    <div class="craft-image-box">
+                        <img src="{{ url_for('static', filename='images/project-lobby.jpg') }}" alt="頂級豪宅大廳挑高景觀與石材工法" loading="lazy">
+                        <div class="craft-float-badge">
+                            <strong>日本住友制震系統</strong>
+                            <span>航太級油壓阻尼技術，有效減震 35% 以上</span>
+                        </div>
+                    </div>
+
+                    <div class="craft-features">
+                        <div class="craft-item">
+                            <div class="craft-item-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                    <path d="M2 17l10 5 10-5"></path>
+                                    <path d="M2 12l10 5 10-5"></path>
+                                </svg>
+                            </div>
+                            <div class="craft-item-content">
+                                <h3>高強度耐震 SRC 鋼骨混擬土</h3>
+                                <p>採用中鋼特規耐震鋼板與高抗滲自密實混凝土，全棟通過專業風洞與國家地震工程研究中心嚴格認證。</p>
+                            </div>
+                        </div>
+
+                        <div class="craft-item">
+                            <div class="craft-item-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 3v18"></path>
+                                    <path d="M3 12h18"></path>
+                                    <path d="M5.6 5.6l12.8 12.8"></path>
+                                    <path d="M18.4 5.6L5.6 18.4"></path>
+                                </svg>
+                            </div>
+                            <div class="craft-item-content">
+                                <h3>雙層中空 Low-E 超靜音節能工法</h3>
+                                <p>採用德國進口 8mm+12A+8mm 雙銀 Low-E 複層玻璃，隔音達到 42dB 降噪標準，並阻隔 99% 紫外線與熱輻射。</p>
+                            </div>
+                        </div>
+
+                        <div class="craft-item">
+                            <div class="craft-item-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M12 6v6l4 2"></path>
+                                </svg>
+                            </div>
+                            <div class="craft-item-content">
+                                <h3>全棟醫療級全熱交換與活水系統</h3>
+                                <p>搭配醫療級 HEPA 正壓淨化設備與德國 BWT 活水循環過濾，讓純淨空氣與活泉健康注入每一座住宅單元。</p>
+                            </div>
+                        </div>
+
+                        <div class="craft-item">
+                            <div class="craft-item-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </div>
+                            <div class="craft-item-content">
+                                <h3>AI 智慧人臉迎賓與軍規智慧安控</h3>
+                                <p>非接觸式 AI 人臉辨識迎賓梯廳連動，私人專屬樓層梯控與無死角光纖防護網，提供極致安心隱私保障。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             線上 VIP 預約賞屋表單 (VIP Appointment Section) - 🌟 核心需求
+             ========================================== -->
+        <section id="booking" class="booking-section">
+            <div class="container">
+                <div class="booking-wrapper">
+                    <!-- 左側尊榮服務與專線 -->
+                    <div class="booking-info">
+                        <div class="booking-info-header">
+                            <span class="section-tag">PRIVATE APPOINTMENT</span>
+                            <h2>預約私人鑑賞<br><span class="gold-text">尊享專屬禮遇</span></h2>
+                            <p>為維護每位層峰貴賓的賞屋品質與隱私，各建案每日僅限額開放 4 組貴賓私人鑑賞，敬請提前預約席次。</p>
+                        </div>
+
+                        <div class="vip-privileges">
+                            <div class="vip-privilege-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>1 對 1 資深資產顧問全案專業導覽</span>
+                            </div>
+                            <div class="vip-privilege-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>米其林星級主廚私房精緻茶點特調禮遇</span>
+                            </div>
+                            <div class="vip-privilege-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>沉浸式 VR 建築光影數位實境體驗</span>
+                            </div>
+                            <div class="vip-privilege-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>專屬地下貴賓私密迎賓車道直達會館</span>
+                            </div>
+                        </div>
+
+                        <div class="booking-contact-card">
+                            <div class="contact-label">VIP 專屬鑑賞專線</div>
+                            <a href="tel:0800888999" class="contact-hotline">0800-888-999</a>
+                            <div class="contact-detail">服務時間：週一至週日 09:30 - 18:30</div>
+                            <div class="contact-detail">接待旗艦：台北市信義區松勇路 88 號・保量美學會館</div>
+                        </div>
+                    </div>
+
+                    <!-- 右側線上預約表單 -->
+                    <div class="booking-form-wrap">
+                        <form id="vipAppointmentForm" class="booking-form" novalidate>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="formName">貴賓姓名 <span class="required">*</span></label>
+                                    <input type="text" id="formName" name="name" class="form-input" placeholder="請填寫您的姓名" required minlength="2">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">稱謂</label>
+                                    <div class="gender-radios">
+                                        <label class="radio-chip active">
+                                            <input type="radio" name="gender" value="先生" checked> 先生
+                                        </label>
+                                        <label class="radio-chip">
+                                            <input type="radio" name="gender" value="女士"> 女士
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="formPhone">聯絡手機 <span class="required">*</span></label>
+                                    <input type="tel" id="formPhone" name="phone" class="form-input" placeholder="例：0912-345-678" required pattern="^09\d{8}$">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="formEmail">電子郵件 (選填)</label>
+                                    <input type="email" id="formEmail" name="email" class="form-input" placeholder="name@example.com">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="formProject">欲鑑賞之建案 <span class="required">*</span></label>
+                                <select id="formProject" name="project" class="form-select" required>
+                                    <option value="" disabled selected>請選擇欲鑑賞的建案</option>
+                                    {% for p in projects %}
+                                    <option value="{{ p.name }}">{{ p.name }}（{{ p.category_name }} / {{ p.location }}）</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="formDate">預約鑑賞日期 <span class="required">*</span></label>
+                                    <input type="date" id="formDate" name="date" class="form-input" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="formTimeSlot">偏好鑑賞時段 <span class="required">*</span></label>
+                                    <select id="formTimeSlot" name="time_slot" class="form-select" required>
+                                        <option value="" disabled selected>請選擇時段</option>
+                                        <option value="上午 10:00 - 12:00">上午 10:00 - 12:00</option>
+                                        <option value="下午 14:00 - 16:00">下午 14:00 - 16:00</option>
+                                        <option value="傍晚 16:00 - 18:00">傍晚 16:00 - 18:00</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="formBudget">規劃置產預算 (選填)</label>
+                                <select id="formBudget" name="budget" class="form-select">
+                                    <option value="未指定">暫不透露 / 視建案而定</option>
+                                    <option value="5,000萬 ~ 8,000萬">5,000萬 ~ 8,000萬</option>
+                                    <option value="8,000萬 ~ 1.5億">8,000萬 ~ 1.5億</option>
+                                    <option value="1.5億 ~ 3億">1.5億 ~ 3億</option>
+                                    <option value="3億以上">3億以上（家族傳承旗艦）</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="formNotes">特殊需求或備註</label>
+                                <textarea id="formNotes" name="notes" class="form-textarea" placeholder="如：隨行貴賓人數、偏好高樓層或特定格局需求..."></textarea>
+                            </div>
+
+                            <div class="form-privacy">
+                                <input type="checkbox" id="formPrivacyCheck" checked required>
+                                <label for="formPrivacyCheck">我同意保量建設依據隱私權政策妥善保管個人資料，並由專屬置產特助與我致電聯繫安排私人賞屋。</label>
+                            </div>
+
+                            <div id="formFeedback" class="form-feedback" role="alert"></div>
+
+                            <div class="submit-btn-wrap">
+                                <button type="submit" id="submitBookingBtn" class="btn-gold btn-submit">
+                                    <span>送出尊榮預約鑑賞</span>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        <polyline points="12 5 19 12 12 19"></polyline>
+                                    </svg>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             層峰業主口碑與見證 (Testimonials Section)
+             ========================================== -->
+        <section id="testimonials" class="testimonials-section">
+            <div class="container">
+                <div class="text-center">
+                    <span class="section-tag">DISTINGUISHED CLIENTS</span>
+                    <h2 class="section-title">層峰業主・真摯共鳴</h2>
+                    <p class="section-desc">因為懂得品味與對品質的挑剔，我們贏得了台灣諸多企業創辦人與跨國領袖的長久信賴。</p>
+                </div>
+
+                <div class="testimonials-grid">
+                    <div class="testimonial-card">
+                        <div class="quote-icon">“</div>
+                        <p class="testimonial-quote">
+                            從看屋、簽約到交屋驗收，保量建設的細膩與精工完全超越我的預期。大安森林公園首排的景觀視野與靜音隔音，讓我在繁忙的企業營運後，能享受真正安寧的家庭時光。
+                        </p>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">林</div>
+                            <div class="author-info">
+                                <h4>林董事長</h4>
+                                <span>半導體上市公司創辦人・入住【保量・天璽】</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="testimonial-card">
+                        <div class="quote-icon">“</div>
+                        <p class="testimonial-quote">
+                            信義區的土地稀缺，但能把現代美學與住友制震阻尼器結合得如此完美的建築屈指可數。這不僅是一棟房子，更是一件足以傳承給下一代的家族傳家之寶。
+                        </p>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">陳</div>
+                            <div class="author-info">
+                                <h4>陳總裁</h4>
+                                <span>跨國航運集團總裁・入住【保量・御峰】</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="testimonial-card">
+                        <div class="quote-icon">“</div>
+                        <p class="testimonial-quote">
+                            身為建築師，我對立面收邊、大理石對花與採光導引有著職業病般的嚴格要求。保量建設的工班團隊工藝精準度，真正做到了教科書等級的藝術美學。
+                        </p>
+                        <div class="testimonial-author">
+                            <div class="author-avatar">張</div>
+                            <div class="author-info">
+                                <h4>張建築師</h4>
+                                <span>國際知名事務所主持建築師・收藏【保量・沐光之森】</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
-    <script>
-        async function fetchGreeting() {
-            const resBox = document.getElementById("api-response");
-            try {
-                resBox.style.display = "block";
-                resBox.style.backgroundColor = "#f7fafc";
-                resBox.style.borderColor = "#e2e8f0";
-                resBox.style.color = "#4a5568";
-                resBox.innerText = "正在向後端 API 取得資料...";
+    <!-- ==========================================
+         建案詳情快速彈窗 (Project Quick View Modal)
+         ========================================== -->
+    <div id="projectModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalProjectName">
+        <div class="project-modal-card">
+            <button id="closeProjectModal" class="modal-close-btn" aria-label="關閉彈窗">&times;</button>
+            <div class="project-modal-header">
+                <img id="modalProjectImg" src="" alt="建案外觀">
+                <div class="project-modal-header-overlay"></div>
+            </div>
+            <div class="project-modal-body">
+                <div id="modalProjectSub" class="project-sub"></div>
+                <h3 id="modalProjectName" class="project-name"></h3>
+                <p id="modalProjectDesc" class="project-desc"></p>
+                <div class="project-specs">
+                    <div class="spec-line">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="10" r="3"></circle>
+                            <path d="M12 21.7C17.3 17 20 13 20 10a8 8 0 1 0-16 0c0 3 2.7 7 8 11.7z"></path>
+                        </svg>
+                        <span id="modalProjectLocation"></span>
+                    </div>
+                    <div class="spec-line">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="9" y1="21" x2="9" y2="9"></line>
+                        </svg>
+                        <span id="modalProjectSpecs"></span>
+                    </div>
+                    <div class="spec-line">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        </svg>
+                        <span id="modalProjectArchitect"></span>
+                    </div>
+                </div>
+                <div style="margin-top: 24px; display: flex; gap: 14px;">
+                    <button id="modalBookDirect" class="btn-gold" style="flex:1; justify-content:center;">
+                        <span>立即預約此建案私人鑑賞</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                const res = await fetch("/api/greet");
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
+    <!-- ==========================================
+         尊榮預約確認憑證 Modal (VIP Certificate Modal)
+         ========================================== -->
+    <div id="certModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="certTitle">
+        <div class="certificate-card">
+            <button id="closeCertModal" class="modal-close-btn" aria-label="關閉憑證">&times;</button>
+            <div class="cert-emblem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <h3 id="certTitle" class="cert-title">尊榮私人鑑賞・預約受理憑證</h3>
+            <div class="cert-sub">CONFIDENTIAL VIP RESERVATION TICKET</div>
 
-                resBox.style.backgroundColor = "#e6fffa";
-                resBox.style.borderColor = "#b2f5ea";
-                resBox.style.color = "#234e52";
-                resBox.innerHTML = `<strong>${data.message}</strong><br><small style="color:#4a5568;">伺服器即時時間：${data.server_time}</small>`;
-            } catch (err) {
-                resBox.style.backgroundColor = "#fff5f5";
-                resBox.style.borderColor = "#fed7d7";
-                resBox.style.color = "#9b2c2c";
-                resBox.innerText = "呼叫後端 API 失敗：" + err.message;
-            }
-        }
-    </script>
+            <div class="cert-id-box">
+                <div class="cert-id-label">專屬預約確認代碼 (RESERVATION ID)</div>
+                <div id="certReservationId" class="cert-id-number">VIP-BL-202610-8888</div>
+            </div>
+
+            <div class="cert-details-list">
+                <div><span>尊榮貴賓</span><span id="certVipName">--</span></div>
+                <div><span>鑑賞建案</span><span id="certProjectName">--</span></div>
+                <div><span>預約日期時段</span><span id="certDateTime">--</span></div>
+                <div><span>聯絡手機</span><span id="certPhone">--</span></div>
+                <div><span>專屬接待規格</span><span>1對1資產顧問・私廚迎賓茶會</span></div>
+            </div>
+
+            <p class="cert-notice">
+                ※ 系統已自動將鑑賞確認資訊加密備查。保量建設專屬特助將於 24 小時內致電確認停車位與隨行需求。
+            </p>
+
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button type="button" id="printCertBtn" class="btn-outline-gold">
+                    <span>列印 / 保存憑證</span>
+                </button>
+                <button type="button" onclick="document.getElementById('certModal').classList.remove('active'); document.body.style.overflow='auto';" class="btn-gold">
+                    <span>確定完成</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 回到頂端按鈕 -->
+    <button id="backToTopBtn" class="back-to-top" aria-label="回到頁面頂端">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
+
+    <!-- ==========================================
+         頁尾 (Footer)
+         ========================================== -->
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="brand-logo">
+                        <div class="logo-symbol"></div>
+                        <div class="logo-text">
+                            <span class="logo-name">保量建設</span>
+                            <span class="logo-sub">BAOLIANG ARCHITECTURE</span>
+                        </div>
+                    </div>
+                    <p>
+                        以時間淬鍊經典，以匠心築見傳世。我們以建築藝術致敬城市，為台灣層峰人士打造歷經歲月考驗的永恆官邸。
+                    </p>
+                </div>
+
+                <div class="footer-col">
+                    <h4 class="footer-heading">經典建案</h4>
+                    <ul class="footer-nav">
+                        <li><a href="#projects" onclick="selectProjectInForm('保量・御峰')">保量・御峰 (信義)</a></li>
+                        <li><a href="#projects" onclick="selectProjectInForm('保量・天璽')">保量・天璽 (大安)</a></li>
+                        <li><a href="#projects" onclick="selectProjectInForm('保量・沐光之森')">保量・沐光之森 (七期)</a></li>
+                        <li><a href="#projects" onclick="selectProjectInForm('保量・天際匯')">保量・天際匯 (南港)</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4 class="footer-heading">快速導覽</h4>
+                    <ul class="footer-nav">
+                        <li><a href="#hero">首頁形象</a></li>
+                        <li><a href="#philosophy">品牌理念</a></li>
+                        <li><a href="#craftsmanship">結構工法</a></li>
+                        <li><a href="#booking">VIP預約賞屋</a></li>
+                        <li><a href="#testimonials">名邸業主見證</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-col">
+                    <h4 class="footer-heading">貴賓會館資訊</h4>
+                    <div class="footer-info">
+                        <p><strong>台北總部旗艦會館：</strong><br>台北市信義區松勇路 88 號</p>
+                        <p><strong>台中市政美學會館：</strong><br>台中市西屯區市政北七路 168 號</p>
+                        <p><strong>尊榮專線：</strong> 0800-888-999</p>
+                        <p><strong>伺服器載入時間：</strong> {{ current_time }} (Powered by Python Flask)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2026 保量建設開發股份有限公司 BAOLIANG DEVELOPMENT CORP. ALL RIGHTS RESERVED.</p>
+                <div style="display:flex; gap: 20px;">
+                    <a href="#booking" style="color:var(--text-muted);">隱私權政策</a>
+                    <a href="#booking" style="color:var(--text-muted);">免責聲明</a>
+                    <a href="#booking" style="color:var(--gold-primary);">VIP 專屬鑑賞</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 主互動腳本 -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
