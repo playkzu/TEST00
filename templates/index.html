@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World - Flask 單頁網站</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #2d3748;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            max-width: 520px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 24px 50px rgba(0, 0, 0, 0.2);
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: #e9d8fd;
+            color: #6b46c1;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            margin-bottom: 16px;
+            letter-spacing: 0.5px;
+        }
+
+        h1 {
+            font-size: 2.4rem;
+            color: #1a202c;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            font-size: 1.05rem;
+            color: #718096;
+            margin-bottom: 28px;
+            line-height: 1.6;
+        }
+
+        .info-box {
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 0.95rem;
+            color: #4a5568;
+            text-align: left;
+        }
+
+        .info-box p {
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 6px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .info-value {
+            font-family: Consolas, Monaco, monospace;
+            background: #edf2f7;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.88rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            opacity: 0.92;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #api-response {
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #e6fffa;
+            border: 1px solid #b2f5ea;
+            border-radius: 8px;
+            color: #234e52;
+            font-size: 0.95rem;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        footer {
+            margin-top: 30px;
+            font-size: 0.8rem;
+            color: #a0aec0;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <span class="badge">Python Flask 3.x</span>
+        <h1>Hello, World!</h1>
+        <p class="subtitle">歡迎來到您的第一個 Flask 一頁式網站！本頁面由 Flask 後端伺服器動態渲染而成。</p>
+
+        <div class="info-box">
+            <p><span class="info-label">伺服器狀態</span> <span class="info-value" style="color:#38a169;">● 正常運作中</span></p>
+            <p><span class="info-label">後端框架</span> <span class="info-value">Flask / Jinja2</span></p>
+            <p><span class="info-label">首次加載時間</span> <span class="info-value" id="load-time">{{ current_time }}</span></p>
+        </div>
+
+        <div class="btn-group">
+            <button onclick="fetchGreeting()">與後端互動打招呼</button>
+        </div>
+
+        <div id="api-response" role="status" aria-live="polite"></div>
+
+        <footer>
+            Built with ❤️ using Python & Flask
+        </footer>
+    </main>
+
+    <script>
+        async function fetchGreeting() {
+            const resBox = document.getElementById("api-response");
+            try {
+                resBox.style.display = "block";
+                resBox.style.backgroundColor = "#f7fafc";
+                resBox.style.borderColor = "#e2e8f0";
+                resBox.style.color = "#4a5568";
+                resBox.innerText = "正在向後端 API 取得資料...";
+
+                const res = await fetch("/api/greet");
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                resBox.style.backgroundColor = "#e6fffa";
+                resBox.style.borderColor = "#b2f5ea";
+                resBox.style.color = "#234e52";
+                resBox.innerHTML = `<strong>${data.message}</strong><br><small style="color:#4a5568;">伺服器即時時間：${data.server_time}</small>`;
+            } catch (err) {
+                resBox.style.backgroundColor = "#fff5f5";
+                resBox.style.borderColor = "#fed7d7";
+                resBox.style.color = "#9b2c2c";
+                resBox.innerText = "呼叫後端 API 失敗：" + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
