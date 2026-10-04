@@ -11,7 +11,8 @@ def test_index_page(client):
     response = client.get("/")
     assert response.status_code == 200
     text = response.get_data(as_text=True)
-    assert "保量建設" in text or "Hello" in text or "html" in text
+    assert "堡量建設" in text or "保量建設" in text
+    assert "堡量豐華梧居墅" in text
 
 def test_api_greet(client):
     response = client.get("/api/greet")
@@ -19,6 +20,7 @@ def test_api_greet(client):
     data = response.get_json()
     assert data["status"] == "success"
     assert "message" in data
+    assert data["company"] == "堡量建設"
 
 def test_api_projects(client):
     response = client.get("/api/projects")
@@ -27,6 +29,7 @@ def test_api_projects(client):
     assert data["status"] == "success"
     assert data["count"] > 0
     assert len(data["data"]) > 0
+    assert data["data"][0]["name"] == "堡量豐華梧居墅"
 
 def test_api_appointment_success(client):
     payload = {
@@ -34,11 +37,11 @@ def test_api_appointment_success(client):
         "gender": "先生",
         "phone": "0912-345-678",
         "email": "chen@example.com",
-        "project": "保量・御峰",
+        "project": "堡量豐華梧居墅",
         "date": "2026-10-15",
         "time_slot": "14:00 - 16:00",
-        "budget": "1.5億以上",
-        "notes": "希望了解頂樓景觀戶配置"
+        "budget": "5000萬以上",
+        "notes": "希望了解臨路電梯名墅配置"
     }
     response = client.post("/api/appointment", json=payload)
     assert response.status_code == 201
@@ -57,3 +60,8 @@ def test_api_appointment_validation_error(client):
     data = response.get_json()
     assert data["status"] == "error"
     assert "errors" in data
+
+def test_static_dist_routing(client):
+    response = client.get("/dist/css/style.min.css")
+    assert response.status_code == 200
+    assert len(response.data) > 0
