@@ -21,6 +21,15 @@
 
     <!-- 額外奢華浮動操作與微交互樣式 -->
     <style>
+        /* 官方形象首頁與預約賞屋區塊底色：調整為雅緻高貴之硃紅/暖紅 */
+        .first,
+        .formTable {
+            background-color: #b83428 !important;
+        }
+        .formTable .content .row .table .sendWrap a {
+            color: #b83428 !important;
+        }
+
         /* 浮動行動快捷選單 (Floating Action Bar) */
         .floating-action-bar {
             position: fixed;
@@ -36,13 +45,13 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            background: linear-gradient(135deg, #c85c27 0%, #9a3e12 100%);
+            background: linear-gradient(135deg, #b83428 0%, #8c2018 100%);
             color: #ffffff !important;
             padding: 10px 16px;
             border-radius: 30px;
             font-size: 14px;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(200, 92, 39, 0.4);
+            box-shadow: 0 4px 15px rgba(184, 52, 40, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.2);
             transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             text-decoration: none;
@@ -50,7 +59,7 @@
         }
         .fab-btn:hover {
             transform: translateY(-3px) scale(1.03);
-            box-shadow: 0 8px 25px rgba(200, 92, 39, 0.6);
+            box-shadow: 0 8px 25px rgba(184, 52, 40, 0.6);
             color: #fff !important;
         }
         .fab-btn.fab-call {
