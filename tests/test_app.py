@@ -1,7 +1,12 @@
 import os
+import sys
 import re
 import sqlite3
 import uuid
+
+# 確保專案根目錄在 sys.path 中，避免直接執行 pytest 時發生 ModuleNotFoundError: No module named 'app'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from app import app, init_db, get_db
 from werkzeug.security import check_password_hash
