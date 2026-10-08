@@ -1,19 +1,19 @@
 """
 Flask + SQLite + Bootstrap 5 訂單管理系統
-功能：
-1. 四張資料表：customer, product, orders, order_item (複合主鍵)
-2. 管理員登入後可維護客戶、商品、訂單
-3. 新增訂單：客戶下拉選單、商品一次勾選多項並填寫數量、即時計算金額
-4. order_item 保存下單當時單價，商品後續改價不影響歷史訂單
-5. 訂單狀態：處理中 / 已出貨 / 已完成 / 已取消，可在列表直接即時更新
-6. 專屬訂單與出貨單頁面 /order/<訂單編號>，包含 QR Code 與列印優化
-7. 內建 5 筆繁體中文測試資料與管理員帳號
+進階安全與功能強化：
+1. 管理員密碼採 Werkzeug 雜湊儲存（scrypt/pbkdf2），程式與畫面絕無明碼
+2. 後台所有頁面需登入 Session 且角色限定為 admin 方可存取
+3. 所有 SQL 全數採用參數化查詢（? 佔位符），徹底杜絕 SQL Injection
+4. 客戶與商品皆採用下拉選單；訂單編號嚴格實施「SO+數字」格式驗證
+5. 數量強制正整數：前端 HTML5/JS、後端 Regex/Int、資料庫 CHECK 三層防護
+6. 保留下單當時單價，動態出貨單 QR Code 生成
 """
 
 import base64
 import functools
 import io
 import os
+import re
 import sqlite3
 import sys
 from datetime import datetime
@@ -38,8 +38,22 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
         pass
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "order-system-super-secret-key-2026")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "order-system-secure-key-2026")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db")
+
+# 狀態常數 (使用 Unicode 跳脫字元，保證全平台資料庫編碼一致)
+STATUS_PENDING = "\u8655\u7406\u4e2d"     # 處理中
+STATUS_SHIPPED = "\u5df2\u51fa\u8ca8"     # 已出貨
+STATUS_COMPLETED = "\u5df2\u5b8c\u6210"   # 已完成
+STATUS_CANCELLED = "\u5df2\u53d6\u6d88"   # 已取消
+ALLOWED_STATUSES = [STATUS_PENDING, STATUS_SHIPPED, STATUS_COMPLETED, STATUS_CANCELLED]
+
+# 預設管理員帳號與安全雜湊字串 (程式碼中絕無明碼密碼)
+DEFAULT_ADMIN_USERNAME = "admin"
+DEFAULT_ADMIN_PASSWORD_HASH = os.environ.get(
+    "ADMIN_PASSWORD_HASH",
+    "scrypt:32768:8:1$GRXqZTu7u8EvVCIg$ad2f8d1f2e084b75553e4170d93010ba853e4ad0e2867bd5429d2619f6ede552332d205124987e8e2cb7c185c980de1e9323965565e09f11715cc7dd4332daa3"
+)
 
 
 def get_db():
@@ -51,7 +65,7 @@ def get_db():
 
 
 def init_db():
-    """初始化資料庫結構與預設測試資料"""
+    """初始化資料庫結構與預設測試資料 (含三層 CHECK 約束)"""
     conn = get_db()
     cursor = conn.cursor()
 
@@ -66,36 +80,37 @@ def init_db():
     );
     """)
 
-    # 2. 商品資料表
+    # 2. 商品資料表 (單價不可為負，庫存為非負整數)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS product (
         product_id  TEXT PRIMARY KEY,
         name        TEXT NOT NULL,
         unit_price  REAL NOT NULL CHECK (unit_price >= 0),
-        stock       INTEGER NOT NULL CHECK (stock >= 0),
+        stock       INTEGER NOT NULL CHECK (typeof(stock) = 'integer' AND stock >= 0),
         category    TEXT
     );
     """)
 
-    # 3. 訂單資料表
-    cursor.execute("""
+    # 3. 訂單資料表 (訂單編號第三層 CHECK 約束：必須為 SO 開頭且後接數字)
+    status_check_sql = f"CHECK (status IN ('{STATUS_PENDING}', '{STATUS_SHIPPED}', '{STATUS_COMPLETED}', '{STATUS_CANCELLED}'))"
+    cursor.execute(f"""
     CREATE TABLE IF NOT EXISTS orders (
-        order_id     TEXT PRIMARY KEY,
+        order_id     TEXT PRIMARY KEY CHECK (order_id GLOB 'SO[0-9]*' AND length(order_id) >= 3),
         customer_id  TEXT NOT NULL,
         order_date   TEXT NOT NULL,
-        status       TEXT NOT NULL CHECK (status IN ('處理中', '已出貨', '已完成', '已取消')),
+        status       TEXT NOT NULL {status_check_sql},
         sales_rep    TEXT,
         FOREIGN KEY (customer_id) REFERENCES customer(customer_id)
             ON UPDATE CASCADE ON DELETE RESTRICT
     );
     """)
 
-    # 4. 訂單明細資料表 (以訂單編號 + 商品編號為複合主鍵)
+    # 4. 訂單明細資料表 (數量第三層 CHECK 約束：必須為整數型別且嚴格大於 0)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS order_item (
         order_id    TEXT NOT NULL,
         product_id  TEXT NOT NULL,
-        quantity    INTEGER NOT NULL CHECK (quantity > 0),
+        quantity    INTEGER NOT NULL CHECK (typeof(quantity) = 'integer' AND quantity > 0),
         unit_price  REAL NOT NULL CHECK (unit_price >= 0),
         PRIMARY KEY (order_id, product_id),
         FOREIGN KEY (order_id) REFERENCES orders(order_id)
@@ -105,25 +120,25 @@ def init_db():
     );
     """)
 
-    # 5. 管理員帳號資料表
+    # 5. 管理員帳號資料表 (密碼雜湊儲存，含角色欄位)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS admin_user (
         username      TEXT PRIMARY KEY,
         password_hash TEXT NOT NULL,
-        display_name  TEXT NOT NULL
+        display_name  TEXT NOT NULL,
+        role          TEXT NOT NULL DEFAULT 'admin'
     );
     """)
 
-    # 檢查是否已有管理員
-    cursor.execute("SELECT COUNT(*) FROM admin_user;")
+    # 檢查並確保預設管理員存在 (以參數化查詢寫入雜湊)
+    cursor.execute("SELECT COUNT(*) FROM admin_user WHERE username = ?;", (DEFAULT_ADMIN_USERNAME,))
     if cursor.fetchone()[0] == 0:
-        default_pwd_hash = generate_password_hash("admin123")
         cursor.execute(
-            "INSERT INTO admin_user (username, password_hash, display_name) VALUES (?, ?, ?);",
-            ("admin", default_pwd_hash, "系統管理員"),
+            "INSERT INTO admin_user (username, password_hash, display_name, role) VALUES (?, ?, ?, ?);",
+            (DEFAULT_ADMIN_USERNAME, DEFAULT_ADMIN_PASSWORD_HASH, "系統管理員", "admin"),
         )
 
-    # 檢查並插入 5 筆繁體中文測試資料 (如果 customer 為空)
+    # 檢查並寫入繁體中文測試客戶 (5 筆)
     cursor.execute("SELECT COUNT(*) FROM customer;")
     if cursor.fetchone()[0] == 0:
         customers = [
@@ -134,10 +149,11 @@ def init_db():
             ("C005", "黃柏彥", "0972-889-900", "高雄市苓雅區四維三路2號", "2026-03-20"),
         ]
         cursor.executemany(
-            "INSERT INTO customer (customer_id, name, phone, address, created_date) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO customer (customer_id, name, phone, address, created_date) VALUES (?, ?, ?, ?, ?);",
             customers,
         )
 
+    # 檢查並寫入繁體中文測試商品 (5 筆)
     cursor.execute("SELECT COUNT(*) FROM product;")
     if cursor.fetchone()[0] == 0:
         products = [
@@ -148,38 +164,40 @@ def init_db():
             ("P005", "不鏽鋼雙層真空保溫杯", 650.0, 120, "生活居家"),
         ]
         cursor.executemany(
-            "INSERT INTO product (product_id, name, unit_price, stock, category) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO product (product_id, name, unit_price, stock, category) VALUES (?, ?, ?, ?, ?);",
             products,
         )
 
+    # 檢查並寫入符合 SO+數字 格式之繁體中文測試訂單 (5 筆)
     cursor.execute("SELECT COUNT(*) FROM orders;")
     if cursor.fetchone()[0] == 0:
         orders = [
-            ("ORD20260301", "C001", "2026-03-01 10:15:00", "已完成", "李佩玲"),
-            ("ORD20260302", "C002", "2026-03-02 14:30:00", "運送中", "張育誠"),
-            ("ORD20260303", "C003", "2026-03-05 09:45:00", "處理中", "李佩玲"),
-            ("ORD20260304", "C004", "2026-03-08 16:20:00", "已完成", "趙家豪"),
-            ("ORD20260305", "C005", "2026-03-10 11:00:00", "已出貨", "張育誠"),
+            ("SO20260301", "C001", "2026-03-01 10:15:00", STATUS_COMPLETED, "李佩玲"),
+            ("SO20260302", "C002", "2026-03-02 14:30:00", STATUS_SHIPPED, "張育誠"),
+            ("SO20260303", "C003", "2026-03-05 09:45:00", STATUS_PENDING, "李佩玲"),
+            ("SO20260304", "C004", "2026-03-08 16:20:00", STATUS_COMPLETED, "趙家豪"),
+            ("SO20260305", "C005", "2026-03-10 11:00:00", STATUS_SHIPPED, "張育誠"),
         ]
         cursor.executemany(
-            "INSERT INTO orders (order_id, customer_id, order_date, status, sales_rep) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO orders (order_id, customer_id, order_date, status, sales_rep) VALUES (?, ?, ?, ?, ?);",
             orders,
         )
 
+    # 檢查並寫入測試訂單明細 (含多項商品、正整數數量、保存下單當下價格)
     cursor.execute("SELECT COUNT(*) FROM order_item;")
     if cursor.fetchone()[0] == 0:
         order_items = [
-            ("ORD20260301", "P001", 1, 3200.0),
-            ("ORD20260301", "P002", 1, 2800.0),
-            ("ORD20260302", "P003", 1, 4500.0),
-            ("ORD20260302", "P005", 2, 650.0),
-            ("ORD20260303", "P004", 2, 1280.0),
-            ("ORD20260304", "P001", 1, 3000.0),  # 保存歷史下單特價 3000
-            ("ORD20260304", "P005", 3, 650.0),
-            ("ORD20260305", "P002", 2, 2800.0),
+            ("SO20260301", "P001", 1, 3200.0),
+            ("SO20260301", "P002", 1, 2800.0),
+            ("SO20260302", "P003", 1, 4500.0),
+            ("SO20260302", "P005", 2, 650.0),
+            ("SO20260303", "P004", 2, 1280.0),
+            ("SO20260304", "P001", 1, 3000.0),  # 保存下單當時特價 3000
+            ("SO20260304", "P005", 3, 650.0),
+            ("SO20260305", "P002", 2, 2800.0),
         ]
         cursor.executemany(
-            "INSERT INTO order_item (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
+            "INSERT INTO order_item (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?);",
             order_items,
         )
 
@@ -187,23 +205,30 @@ def init_db():
     conn.close()
 
 
-# 初始化資料庫
+# 初始化資料庫結構
 init_db()
 
 
-def login_required(view):
-    """驗證管理員登入裝飾器"""
+def admin_required(view):
+    """
+    後台頁面存取權限驗證裝飾器：
+    1. 必須已登入 Session (session['logged_in'] is True)
+    2. 角色必須嚴格為管理員 (session['role'] == 'admin')
+    """
     @functools.wraps(view)
     def wrapped_view(**kwargs):
         if not session.get("logged_in"):
-            flash("請先登入管理員帳號以繼續操作。", "warning")
+            flash("請先登入管理員帳號以存取後台管理功能。", "warning")
             return redirect(url_for("login", next=request.path))
+        if session.get("role") != "admin":
+            flash("權限不足：您目前的身份非系統管理員，無法進入後台！", "danger")
+            return redirect(url_for("login"))
         return view(**kwargs)
     return wrapped_view
 
 
 def generate_qr_code_base64(data_text):
-    """將文字轉換為 QR Code Base64 PNG 圖片"""
+    """產生出貨單專屬網址之 QR Code (Base64 PNG)"""
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -219,33 +244,39 @@ def generate_qr_code_base64(data_text):
 
 
 # ====================================================================
-# 身份驗證路由 (登入、登出)
+# 身份認證模組 (Werkzeug 雜湊比對，畫面與程式零明碼)
 # ====================================================================
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("logged_in"):
+    if session.get("logged_in") and session.get("role") == "admin":
         return redirect(url_for("dashboard"))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        password = request.form.get("password", "")
 
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM admin_user WHERE username = ?;", (username,))
+        # 參數化查詢查詢管理員帳號
+        cursor.execute(
+            "SELECT username, password_hash, display_name, role FROM admin_user WHERE username = ?;",
+            (username,),
+        )
         user = cursor.fetchone()
         conn.close()
 
+        # 使用 werkzeug 安全雜湊比對密碼
         if user and check_password_hash(user["password_hash"], password):
             session["logged_in"] = True
             session["username"] = user["username"]
             session["display_name"] = user["display_name"]
-            flash(f"歡迎回來，{user['display_name']}！", "success")
+            session["role"] = user["role"]
+            flash(f"登入成功！歡迎回來，{user['display_name']}。", "success")
             next_url = request.args.get("next")
             return redirect(next_url or url_for("dashboard"))
         else:
-            flash("帳號或密碼錯誤，請重新輸入。（預設帳密：admin / admin123）", "danger")
+            flash("帳號或密碼錯誤，請重新確認。", "danger")
 
     return render_template("login.html")
 
@@ -253,28 +284,27 @@ def login():
 @app.route("/logout")
 def logout():
     session.clear()
-    flash("您已成功登出系統。", "info")
+    flash("您已安全登出後台管理系統。", "info")
     return redirect(url_for("login"))
 
 
 # ====================================================================
-# 儀表板
+# 營運儀表板 (需 admin 權限，全參數化 SQL)
 # ====================================================================
 
 @app.route("/")
 def index():
-    if session.get("logged_in"):
+    if session.get("logged_in") and session.get("role") == "admin":
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
 
 @app.route("/dashboard")
-@login_required
+@admin_required
 def dashboard():
     conn = get_db()
     cursor = conn.cursor()
 
-    # 統計數據
     cursor.execute("SELECT COUNT(*) FROM customer;")
     customer_count = cursor.fetchone()[0]
 
@@ -284,18 +314,18 @@ def dashboard():
     cursor.execute("SELECT COUNT(*) FROM orders;")
     order_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM orders WHERE status = '處理中';")
+    cursor.execute("SELECT COUNT(*) FROM orders WHERE status = ?;", (STATUS_PENDING,))
     pending_count = cursor.fetchone()[0]
 
     cursor.execute("""
     SELECT COALESCE(SUM(quantity * unit_price), 0)
     FROM order_item oi
     JOIN orders o ON oi.order_id = o.order_id
-    WHERE o.status != '已取消';
-    """)
+    WHERE o.status != ?;
+    """, (STATUS_CANCELLED,))
     total_sales = cursor.fetchone()[0]
 
-    # 最近 5 筆訂單
+    # 最近 5 筆訂單 (全參數化)
     cursor.execute("""
     SELECT o.order_id, c.name AS customer_name, o.order_date, o.status, o.sales_rep,
            COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_amount,
@@ -305,12 +335,17 @@ def dashboard():
     LEFT JOIN order_item oi ON o.order_id = oi.order_id
     GROUP BY o.order_id
     ORDER BY o.order_date DESC
-    LIMIT 5;
-    """)
+    LIMIT ?;
+    """, (5,))
     recent_orders = cursor.fetchall()
 
-    # 低庫存預警商品 (庫存 < 30)
-    cursor.execute("SELECT product_id, name, unit_price, stock, category FROM product WHERE stock < 30 ORDER BY stock ASC;")
+    # 低庫存警示
+    cursor.execute("""
+    SELECT product_id, name, unit_price, stock, category 
+    FROM product 
+    WHERE stock < ? 
+    ORDER BY stock ASC;
+    """, (30,))
     low_stock_products = cursor.fetchall()
 
     conn.close()
@@ -327,11 +362,11 @@ def dashboard():
 
 
 # ====================================================================
-# 客戶管理 (Customer CRUD)
+# 客戶管理 (需 admin 權限，全參數化 SQL)
 # ====================================================================
 
 @app.route("/customers")
-@login_required
+@admin_required
 def customers():
     conn = get_db()
     cursor = conn.cursor()
@@ -349,7 +384,7 @@ def customers():
 
 
 @app.route("/customers/new", methods=["POST"])
-@login_required
+@admin_required
 def customer_create():
     customer_id = request.form.get("customer_id", "").strip().upper()
     name = request.form.get("name", "").strip()
@@ -357,7 +392,7 @@ def customer_create():
     address = request.form.get("address", "").strip()
 
     if not customer_id or not name:
-        flash("客戶編號與客戶名稱為必填欄位！", "danger")
+        flash("客戶編號與客戶名稱為必填項目！", "danger")
         return redirect(url_for("customers"))
 
     created_date = datetime.now().strftime("%Y-%m-%d")
@@ -369,9 +404,9 @@ def customer_create():
             (customer_id, name, phone, address, created_date),
         )
         conn.commit()
-        flash(f"已成功建立客戶「{name}」({customer_id})！", "success")
+        flash(f"客戶「{name}」({customer_id}) 建立成功！", "success")
     except sqlite3.IntegrityError:
-        flash(f"客戶編號「{customer_id}」已存在，請使用其他編號。", "danger")
+        flash(f"客戶編號「{customer_id}」已存在，請使用不同編號。", "danger")
     finally:
         conn.close()
 
@@ -379,14 +414,14 @@ def customer_create():
 
 
 @app.route("/customers/<customer_id>/edit", methods=["POST"])
-@login_required
+@admin_required
 def customer_update(customer_id):
     name = request.form.get("name", "").strip()
     phone = request.form.get("phone", "").strip()
     address = request.form.get("address", "").strip()
 
     if not name:
-        flash("客戶名稱為必填！", "danger")
+        flash("客戶名稱為必填項目！", "danger")
         return redirect(url_for("customers"))
 
     conn = get_db()
@@ -402,27 +437,27 @@ def customer_update(customer_id):
 
 
 @app.route("/customers/<customer_id>/delete", methods=["POST"])
-@login_required
+@admin_required
 def customer_delete(customer_id):
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM customer WHERE customer_id = ?;", (customer_id,))
         conn.commit()
-        flash(f"已成功刪除客戶 ({customer_id})。", "info")
+        flash(f"已刪除客戶 ({customer_id})。", "info")
     except sqlite3.IntegrityError:
-        flash(f"無法刪除客戶 ({customer_id})，因為該客戶已有相關訂單紀錄！", "danger")
+        flash(f"無法刪除客戶 ({customer_id})：該客戶已有訂單紀錄！", "danger")
     finally:
         conn.close()
     return redirect(url_for("customers"))
 
 
 # ====================================================================
-# 商品管理 (Product CRUD)
+# 商品管理 (需 admin 權限，全參數化 SQL，改價不影響歷史訂單)
 # ====================================================================
 
 @app.route("/products")
-@login_required
+@admin_required
 def products():
     conn = get_db()
     cursor = conn.cursor()
@@ -440,7 +475,7 @@ def products():
 
 
 @app.route("/products/new", methods=["POST"])
-@login_required
+@admin_required
 def product_create():
     product_id = request.form.get("product_id", "").strip().upper()
     name = request.form.get("name", "").strip()
@@ -449,7 +484,7 @@ def product_create():
         unit_price = float(request.form.get("unit_price", 0))
         stock = int(request.form.get("stock", 0))
     except ValueError:
-        flash("單價或庫存格式不正確！", "danger")
+        flash("單價或庫存數值格式錯誤！", "danger")
         return redirect(url_for("products"))
 
     if unit_price < 0 or stock < 0:
@@ -470,7 +505,7 @@ def product_create():
         conn.commit()
         flash(f"已成功新增商品「{name}」({product_id})！", "success")
     except sqlite3.IntegrityError:
-        flash(f"商品編號「{product_id}」已存在或違反約束條件！", "danger")
+        flash(f"商品編號「{product_id}」重複或違反約束條件！", "danger")
     finally:
         conn.close()
 
@@ -478,7 +513,7 @@ def product_create():
 
 
 @app.route("/products/<product_id>/edit", methods=["POST"])
-@login_required
+@admin_required
 def product_update(product_id):
     name = request.form.get("name", "").strip()
     category = request.form.get("category", "").strip()
@@ -501,7 +536,7 @@ def product_update(product_id):
             (name, unit_price, stock, category, product_id),
         )
         conn.commit()
-        flash(f"商品「{name}」資訊已成功更新！（現行牌價變更為 NT$ {unit_price:,.0f}，歷史訂單仍保存下單當下價格不受影響）", "success")
+        flash(f"商品「{name}」牌價已變更為 NT$ {unit_price:,.0f}（歷史訂單單價不受影響）。", "success")
     except sqlite3.IntegrityError as e:
         flash(f"更新失敗：{e}", "danger")
     finally:
@@ -511,27 +546,27 @@ def product_update(product_id):
 
 
 @app.route("/products/<product_id>/delete", methods=["POST"])
-@login_required
+@admin_required
 def product_delete(product_id):
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM product WHERE product_id = ?;", (product_id,))
         conn.commit()
-        flash(f"商品 ({product_id}) 已刪除。", "info")
+        flash(f"已成功刪除商品 ({product_id})。", "info")
     except sqlite3.IntegrityError:
-        flash(f"無法刪除商品 ({product_id})，因為已有歷史訂單包含此商品！", "danger")
+        flash(f"無法刪除商品 ({product_id})：已有歷史訂單包含此商品！", "danger")
     finally:
         conn.close()
     return redirect(url_for("products"))
 
 
 # ====================================================================
-# 訂單管理 (Orders CRUD、下拉勾選多項、在線更新狀態)
+# 訂單管理 (需 admin 權限，下拉選單挑選、SO格式驗證、數量正整數驗證)
 # ====================================================================
 
 @app.route("/orders")
-@login_required
+@admin_required
 def orders():
     conn = get_db()
     cursor = conn.cursor()
@@ -554,7 +589,7 @@ def orders():
 
 
 @app.route("/orders/new", methods=["GET", "POST"])
-@login_required
+@admin_required
 def order_new():
     conn = get_db()
     cursor = conn.cursor()
@@ -563,14 +598,14 @@ def order_new():
         customer_id = request.form.get("customer_id", "").strip()
         sales_rep = request.form.get("sales_rep", "").strip()
         order_date = request.form.get("order_date", "").strip()
-        order_id = request.form.get("order_id", "").strip()
+        order_id = request.form.get("order_id", "").strip().upper()
 
         if not order_date:
             order_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # 自動生成訂單編號
+        # 自動生成 SO+數字 預設訂單編號
         if not order_id:
-            today_prefix = datetime.now().strftime("ORD%Y%m%d")
+            today_prefix = datetime.now().strftime("SO%Y%m%d")
             cursor.execute("SELECT order_id FROM orders WHERE order_id LIKE ? ORDER BY order_id DESC LIMIT 1;", (f"{today_prefix}%",))
             last_order = cursor.fetchone()
             if last_order:
@@ -582,45 +617,63 @@ def order_new():
             else:
                 order_id = f"{today_prefix}001"
 
-        # 取得被勾選的商品列表
-        selected_product_ids = request.form.getlist("selected_products")
+        # 【需求 4：訂單編號加上 SO+數字 格式驗證 (後端第二層防護)】
+        if not re.match(r"^SO\d+$", order_id):
+            flash("訂單編號格式不正確！必須為「SO」開頭加上數字（例如：SO20261009001 或 SO001）。", "danger")
+            conn.close()
+            return redirect(url_for("order_new"))
 
         if not customer_id:
-            flash("請選擇客戶！", "danger")
+            flash("請由下拉選單選取訂購客戶！", "danger")
             conn.close()
             return redirect(url_for("order_new"))
 
-        if not selected_product_ids:
-            flash("請至少勾選一項要購買的商品！", "danger")
+        # 【需求 4 & 5：商品下拉選單與多項商品動態提交】
+        product_ids = request.form.getlist("product_id")
+        quantities = request.form.getlist("quantity")
+
+        if not product_ids:
+            flash("請至少選擇一項商品！", "danger")
             conn.close()
             return redirect(url_for("order_new"))
 
+        # 檢驗商品是否重複挑選 (複合主鍵防呆)
+        seen_products = set()
         items_to_insert = []
-        for pid in selected_product_ids:
-            qty_str = request.form.get(f"quantity_{pid}", "1").strip()
-            try:
-                qty = int(qty_str)
-                if qty <= 0:
-                    raise ValueError
-            except ValueError:
-                flash(f"商品 {pid} 的購買數量必須大於 0！", "danger")
+
+        for pid, qty_str in zip(product_ids, quantities):
+            pid = pid.strip()
+            qty_str = qty_str.strip()
+            if not pid:
+                continue
+
+            if pid in seen_products:
+                flash(f"訂單中重複選擇了相同商品 ({pid})！同一筆訂單請合併填寫數量。", "danger")
+                conn.close()
+                return redirect(url_for("order_new"))
+            seen_products.add(pid)
+
+            # 【需求 5：數量必須是正整數 (後端第二層防護：阻擋負數、小數、非純數字、0)】
+            if not re.match(r"^[1-9]\d*$", qty_str):
+                flash(f"商品 ({pid}) 的購買數量必須是正整數（大於 0 之整數，不可為 0、負數或小數）！", "danger")
                 conn.close()
                 return redirect(url_for("order_new"))
 
-            # 查詢商品當前定價與庫存
+            qty = int(qty_str)
+
+            # 參數化查詢商品牌價與庫存
             cursor.execute("SELECT name, unit_price, stock FROM product WHERE product_id = ?;", (pid,))
             prod = cursor.fetchone()
             if not prod:
-                flash(f"找不到商品 {pid}！", "danger")
+                flash(f"找不到商品編號「{pid}」！", "danger")
                 conn.close()
                 return redirect(url_for("order_new"))
 
             if prod["stock"] < qty:
-                flash(f"商品「{prod['name']}」庫存不足（目前庫存：{prod['stock']}，欲購買：{qty}）！", "danger")
+                flash(f"商品「{prod['name']}」庫存不足（現存：{prod['stock']}，欲購：{qty}）！", "danger")
                 conn.close()
                 return redirect(url_for("order_new"))
 
-            # 記錄下單當時單價 (unit_price) 與扣減庫存量
             items_to_insert.append({
                 "product_id": pid,
                 "name": prod["name"],
@@ -628,14 +681,19 @@ def order_new():
                 "current_unit_price": prod["unit_price"],
             })
 
-        # 透過交易同時寫入 orders、order_item 並扣減庫存
+        if not items_to_insert:
+            flash("未選取任何有效商品，請重新填寫！", "danger")
+            conn.close()
+            return redirect(url_for("order_new"))
+
+        # 透過交易寫入訂單與明細 (全參數化查詢)
         try:
             cursor.execute(
                 "INSERT INTO orders (order_id, customer_id, order_date, status, sales_rep) VALUES (?, ?, ?, ?, ?);",
-                (order_id, customer_id, order_date, "處理中", sales_rep or "線上業務"),
+                (order_id, customer_id, order_date, STATUS_PENDING, sales_rep or "線上業務"),
             )
             for item in items_to_insert:
-                # 寫入明細，保存下單當時價格
+                # 寫入 order_item (儲存下單當下價格，觸發第三層 CHECK 約束)
                 cursor.execute(
                     "INSERT INTO order_item (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?);",
                     (order_id, item["product_id"], item["quantity"], item["current_unit_price"]),
@@ -647,17 +705,17 @@ def order_new():
                 )
 
             conn.commit()
-            flash(f"訂單「{order_id}」建立成功！已扣除庫存並保存當前下單價格。", "success")
+            flash(f"訂單「{order_id}」建立成功！已保存下單當時價格並自動扣減庫存。", "success")
             conn.close()
             return redirect(url_for("order_detail", order_id=order_id))
 
         except sqlite3.IntegrityError as e:
             conn.rollback()
-            flash(f"建立訂單失敗：{e}", "danger")
+            flash(f"資料庫約束阻擋建立（請確認訂單格式或數量正整數）：{e}", "danger")
             conn.close()
             return redirect(url_for("order_new"))
 
-    # GET 頁面：載入所有客戶與商品
+    # GET 請求：查詢所有客戶與商品以供下拉選單使用
     cursor.execute("SELECT customer_id, name, phone FROM customer ORDER BY customer_id ASC;")
     customers = cursor.fetchall()
 
@@ -665,19 +723,18 @@ def order_new():
     products = cursor.fetchall()
     conn.close()
 
-    today_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    today_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return render_template("order_new.html", customers=customers, products=products, today_str=today_str)
 
 
 @app.route("/api/orders/<order_id>/status", methods=["POST"])
-@login_required
+@admin_required
 def api_order_status_update(order_id):
-    """供列表即時下拉選單切換訂單狀態 (AJAX)"""
+    """訂單列表即時更新狀態 API (全參數化)"""
     data = request.get_json(silent=True) or {}
     new_status = data.get("status") or request.form.get("status")
-    allowed = ["處理中", "已出貨", "已完成", "已取消"]
-    if new_status not in allowed:
-        return jsonify({"success": False, "error": f"狀態必須為以下之一：{', '.join(allowed)}"}), 400
+    if new_status not in ALLOWED_STATUSES:
+        return jsonify({"success": False, "error": f"狀態僅限以下選項：{', '.join(ALLOWED_STATUSES)}"}), 400
 
     conn = get_db()
     cursor = conn.cursor()
@@ -688,12 +745,11 @@ def api_order_status_update(order_id):
 
 
 @app.route("/orders/<order_id>/status", methods=["POST"])
-@login_required
+@admin_required
 def order_status_update_form(order_id):
-    """支援標準 HTML Form 提交更新狀態"""
+    """標準 Form 提交更新狀態 (全參數化)"""
     new_status = request.form.get("status")
-    allowed = ["處理中", "已出貨", "已完成", "已取消"]
-    if new_status in allowed:
+    if new_status in ALLOWED_STATUSES:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("UPDATE orders SET status = ? WHERE order_id = ?;", (new_status, order_id))
@@ -701,16 +757,16 @@ def order_status_update_form(order_id):
         conn.close()
         flash(f"訂單「{order_id}」狀態已更新為「{new_status}」。", "success")
     else:
-        flash("無效的訂單狀態！", "danger")
+        flash("無效的訂單狀態選項！", "danger")
     return redirect(url_for("orders"))
 
 
 @app.route("/orders/<order_id>/delete", methods=["POST"])
-@login_required
+@admin_required
 def order_delete(order_id):
     conn = get_db()
     cursor = conn.cursor()
-    # 刪除訂單時先加回庫存
+    # 刪除前自動補回庫存 (全參數化)
     cursor.execute("SELECT product_id, quantity FROM order_item WHERE order_id = ?;", (order_id,))
     items = cursor.fetchall()
     for it in items:
@@ -718,20 +774,21 @@ def order_delete(order_id):
     cursor.execute("DELETE FROM orders WHERE order_id = ?;", (order_id,))
     conn.commit()
     conn.close()
-    flash(f"訂單「{order_id}」已成功刪除，相關庫存已自動回補！", "info")
+    flash(f"訂單「{order_id}」已刪除，商品庫存已全數自動回補！", "info")
     return redirect(url_for("orders"))
 
 
 # ====================================================================
-# 專屬訂單頁面與出貨單 QR Code (/order/<訂單編號>)
+# 專屬訂單出貨單頁面與 QR Code (/order/<訂單編號>)
 # ====================================================================
 
 @app.route("/order/<order_id>")
+@admin_required
 def order_detail(order_id):
     conn = get_db()
     cursor = conn.cursor()
 
-    # 查詢訂單主檔與客戶資料
+    # 參數化查詢訂單主檔與客戶資訊
     cursor.execute("""
     SELECT o.order_id, o.order_date, o.status, o.sales_rep,
            c.customer_id, c.name AS customer_name, c.phone AS customer_phone, c.address AS customer_address
@@ -743,9 +800,9 @@ def order_detail(order_id):
 
     if not order:
         conn.close()
-        return render_template("404.html", message=f"找不到訂單編號「{order_id}」的資料"), 404
+        return render_template("404.html", message=f"找不到訂單編號「{order_id}」之出貨紀錄"), 404
 
-    # 查詢訂單明細 (使用下單時保存的 unit_price，並同時查出商品目前牌價以供對比)
+    # 參數化查詢出貨明細 (使用下單保存之單價 unit_price)
     cursor.execute("""
     SELECT oi.order_id, oi.product_id, p.name AS product_name, p.category,
            oi.quantity, oi.unit_price, p.unit_price AS current_catalog_price,
@@ -777,7 +834,7 @@ def order_detail(order_id):
 
 
 # ====================================================================
-# 健康檢查與 API
+# 健康檢查 API
 # ====================================================================
 
 @app.route("/api/health")
@@ -790,10 +847,10 @@ def api_health():
 
 
 if __name__ == "__main__":
-    print("=" * 60)
+    print("=" * 65)
     print("  訂單管理系統 (Flask + SQLite + Bootstrap 5) 正在啟動...")
-    print("  預設管理員帳號: admin")
-    print("  預設管理員密碼: admin123")
+    print("  安全性模式：密碼採 Werkzeug scrypt 雜湊加密，畫面零明碼")
+    print("  後台權限管制：所有維護功能皆需 admin 角色")
     print("  請在瀏覽器開啟: http://127.0.0.1:5000")
-    print("=" * 60)
+    print("=" * 65)
     app.run(debug=True, host="127.0.0.1", port=5000)

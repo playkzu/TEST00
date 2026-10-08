@@ -12,7 +12,7 @@
                         <i class="bi bi-shield-lock-fill fs-2"></i>
                     </div>
                     <h4 class="fw-bold mb-1">管理員登入</h4>
-                    <p class="text-muted small">請輸入帳號密碼以管理訂單、客戶與商品</p>
+                    <p class="text-muted small">後台受安全存取控制保護，請登入管理員帳號</p>
                 </div>
 
                 <form method="POST" action="{{ url_for('login', next=request.args.get('next')) }}">
@@ -20,7 +20,7 @@
                         <label for="username" class="form-label small fw-semibold">帳號 (Username)</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
-                            <input type="text" class="form-control" id="username" name="username" value="admin" required autofocus placeholder="請輸入管理員帳號">
+                            <input type="text" class="form-control" id="username" name="username" required autofocus placeholder="請輸入管理員帳號">
                         </div>
                     </div>
 
@@ -28,26 +28,19 @@
                         <label for="password" class="form-label small fw-semibold">密碼 (Password)</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light"><i class="bi bi-key"></i></span>
-                            <input type="password" class="form-control" id="password" name="password" value="admin123" required placeholder="請輸入密碼">
+                            <input type="password" class="form-control" id="password" name="password" required placeholder="請輸入密碼">
                         </div>
                     </div>
 
                     <div class="d-grid mt-4">
                         <button type="submit" class="btn btn-primary btn-lg shadow-sm">
-                            <i class="bi bi-box-arrow-in-right me-1"></i>登入系統
+                            <i class="bi bi-box-arrow-in-right me-1"></i>安全登入
                         </button>
                     </div>
                 </form>
 
-                <div class="alert alert-info border-0 bg-info bg-opacity-10 mt-4 mb-0 small">
-                    <div class="d-flex gap-2">
-                        <i class="bi bi-info-circle-fill text-info mt-1"></i>
-                        <div>
-                            <strong>預設測試帳密：</strong><br>
-                            帳號：<code>admin</code><br>
-                            密碼：<code>admin123</code>
-                        </div>
-                    </div>
+                <div class="text-center mt-4 text-muted extra-small" style="font-size: 0.78rem;">
+                    <i class="bi bi-lock-fill me-1 text-success"></i>採用 Werkzeug 不可逆密碼雜湊機制防護
                 </div>
             </div>
         </div>
