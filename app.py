@@ -12,6 +12,7 @@ Flask + SQLite + Bootstrap 5 訂單管理系統
 import base64
 import functools
 import io
+import json
 import os
 import re
 import sqlite3
@@ -250,7 +251,7 @@ def generate_qr_code_base64(data_text):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if session.get("logged_in") and session.get("role") == "admin":
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("admin"))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -274,7 +275,7 @@ def login():
             session["role"] = user["role"]
             flash(f"登入成功！歡迎回來，{user['display_name']}。", "success")
             next_url = request.args.get("next")
-            return redirect(next_url or url_for("dashboard"))
+            return redirect(next_url or url_for("admin"))
         else:
             flash("帳號或密碼錯誤，請重新確認。", "danger")
 
@@ -289,74 +290,146 @@ def logout():
 
 
 # ====================================================================
-# 營運儀表板 (需 admin 權限，全參數化 SQL)
+# 營運儀表板 /admin (需 admin 權限，全參數化 SQL)
 # ====================================================================
 
 @app.route("/")
 def index():
     if session.get("logged_in") and session.get("role") == "admin":
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("admin"))
     return redirect(url_for("login"))
 
 
-@app.route("/dashboard")
+@app.route("/admin", endpoint="admin")
+@app.route("/admin/dashboard", endpoint="admin_dashboard")
+@app.route("/dashboard", endpoint="dashboard")
 @admin_required
-def dashboard():
+def admin_dashboard():
+    """
+    營運儀表板 (/admin):
+    1. 上方四張 KPI 卡：累計營收、有效訂單數、平均客單價、客戶數 (已取消訂單不列入計算)
+    2. 每月營收趨勢：折線圖 (Chart.js)
+    3. 訂單狀態分布：環圈圖 (Chart.js)
+    4. 熱銷商品 Top 5：商品名稱、售出數量、營收
+    5. 客戶消費排行 Top 5：客戶名稱、訂單數、消費金額
+    6. 全額千分位格式化與 Bootstrap 5 響應式排版 (手機單欄顯示)
+    """
     conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM customer;")
-    customer_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM product;")
-    product_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM orders;")
-    order_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM orders WHERE status = ?;", (STATUS_PENDING,))
-    pending_count = cursor.fetchone()[0]
-
+    # 1. 上方四張 KPI 卡 (狀態為「已取消」之訂單不列入計算)
+    # 1.1 累計營收
     cursor.execute("""
-    SELECT COALESCE(SUM(quantity * unit_price), 0)
+    SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)
     FROM order_item oi
     JOIN orders o ON oi.order_id = o.order_id
     WHERE o.status != ?;
     """, (STATUS_CANCELLED,))
-    total_sales = cursor.fetchone()[0]
+    total_revenue = float(cursor.fetchone()[0])
 
-    # 最近 5 筆訂單 (全參數化)
+    # 1.2 有效訂單數 (排除已取消)
+    cursor.execute("SELECT COUNT(*) FROM orders WHERE status != ?;", (STATUS_CANCELLED,))
+    valid_order_count = int(cursor.fetchone()[0])
+
+    # 1.3 平均客單價 (AOV: 累計營收 / 有效訂單數)
+    avg_order_value = (total_revenue / valid_order_count) if valid_order_count > 0 else 0.0
+
+    # 1.4 客戶數 (成交客戶數：排除已取消訂單之獨立客戶數；及全系統總客戶數)
+    cursor.execute("SELECT COUNT(DISTINCT customer_id) FROM orders WHERE status != ?;", (STATUS_CANCELLED,))
+    active_customer_count = int(cursor.fetchone()[0])
+
+    cursor.execute("SELECT COUNT(*) FROM customer;")
+    total_customer_count = int(cursor.fetchone()[0])
+
+    # 2. 每月營收趨勢：折線圖 (Chart.js，排除已取消)
     cursor.execute("""
-    SELECT o.order_id, c.name AS customer_name, o.order_date, o.status, o.sales_rep,
-           COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_amount,
-           COUNT(oi.product_id) AS item_count
+    SELECT strftime('%Y-%m', o.order_date) AS month,
+           COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS revenue
     FROM orders o
-    JOIN customer c ON o.customer_id = c.customer_id
-    LEFT JOIN order_item oi ON o.order_id = oi.order_id
-    GROUP BY o.order_id
-    ORDER BY o.order_date DESC
-    LIMIT ?;
-    """, (5,))
-    recent_orders = cursor.fetchall()
+    JOIN order_item oi ON o.order_id = oi.order_id
+    WHERE o.status != ?
+    GROUP BY strftime('%Y-%m', o.order_date)
+    ORDER BY month ASC;
+    """, (STATUS_CANCELLED,))
+    monthly_rows = cursor.fetchall()
+    monthly_labels = [row["month"] for row in monthly_rows]
+    monthly_data = [float(row["revenue"]) for row in monthly_rows]
+    if not monthly_labels:
+        monthly_labels = [datetime.now().strftime("%Y-%m")]
+        monthly_data = [0.0]
 
-    # 低庫存警示
+    # 3. 訂單狀態分布：環圈圖 (Chart.js，包含全部狀態)
+    cursor.execute("""
+    SELECT status, COUNT(*) AS count
+    FROM orders
+    GROUP BY status;
+    """)
+    status_rows = cursor.fetchall()
+    status_dict = {row["status"]: int(row["count"]) for row in status_rows}
+    status_order = [STATUS_PENDING, STATUS_SHIPPED, STATUS_COMPLETED, STATUS_CANCELLED]
+    status_labels = status_order
+    status_data = [status_dict.get(s, 0) for s in status_order]
+
+    # 4. 熱銷商品 Top 5 (排除已取消，依售出數量排序)
+    cursor.execute("""
+    SELECT p.product_id,
+           p.name AS product_name,
+           p.category,
+           p.unit_price,
+           COALESCE(SUM(oi.quantity), 0) AS total_quantity,
+           COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_revenue
+    FROM product p
+    JOIN order_item oi ON p.product_id = oi.product_id
+    JOIN orders o ON oi.order_id = o.order_id
+    WHERE o.status != ?
+    GROUP BY p.product_id, p.name, p.category, p.unit_price
+    ORDER BY total_quantity DESC, total_revenue DESC
+    LIMIT ?;
+    """, (STATUS_CANCELLED, 5))
+    top_products = cursor.fetchall()
+
+    # 5. 客戶消費排行 Top 5 (排除已取消，依消費金額排序)
+    cursor.execute("""
+    SELECT c.customer_id,
+           c.name AS customer_name,
+           c.phone,
+           COUNT(DISTINCT o.order_id) AS order_count,
+           COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_spent
+    FROM customer c
+    JOIN orders o ON c.customer_id = o.customer_id
+    JOIN order_item oi ON o.order_id = oi.order_id
+    WHERE o.status != ?
+    GROUP BY c.customer_id, c.name, c.phone
+    ORDER BY total_spent DESC, order_count DESC
+    LIMIT ?;
+    """, (STATUS_CANCELLED, 5))
+    top_customers = cursor.fetchall()
+
+    # 輔助：低庫存監控商品
     cursor.execute("""
     SELECT product_id, name, unit_price, stock, category 
     FROM product 
     WHERE stock < ? 
-    ORDER BY stock ASC;
+    ORDER BY stock ASC
+    LIMIT 5;
     """, (30,))
     low_stock_products = cursor.fetchall()
 
     conn.close()
+
     return render_template(
-        "dashboard.html",
-        customer_count=customer_count,
-        product_count=product_count,
-        order_count=order_count,
-        pending_count=pending_count,
-        total_sales=total_sales,
-        recent_orders=recent_orders,
+        "admin.html",
+        total_revenue=total_revenue,
+        valid_order_count=valid_order_count,
+        avg_order_value=avg_order_value,
+        active_customer_count=active_customer_count,
+        total_customer_count=total_customer_count,
+        monthly_labels_json=json.dumps(monthly_labels),
+        monthly_data_json=json.dumps(monthly_data),
+        status_labels_json=json.dumps(status_labels),
+        status_data_json=json.dumps(status_data),
+        top_products=top_products,
+        top_customers=top_customers,
         low_stock_products=low_stock_products,
     )
 

@@ -243,3 +243,91 @@ def test_historical_price_preservation(client):
     cur.execute("SELECT unit_price FROM order_item WHERE order_id = ? AND product_id = 'P005';", (test_ord_id,))
     assert cur.fetchone()[0] == original_price
     conn.close()
+
+# ====================================================================
+# 需求：後台營運儀表板 /admin 測試
+# ====================================================================
+
+def test_admin_dashboard_requires_login(client):
+    """驗證未登入無法存取 /admin，必須重導向至 /login"""
+    resp = client.get("/admin", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]
+
+
+def test_admin_dashboard_renders_successfully_for_admin(client):
+    """驗證管理員登入後，可正常瀏覽 /admin 營運儀表板並包含所有要求區塊"""
+    login_as_admin(client)
+    resp = client.get("/admin")
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+
+    # 1. 四張 KPI 卡
+    assert "累計營收" in html
+    assert "有效訂單數" in html
+    assert "平均客單價" in html
+    assert "客戶數" in html
+    assert "排除已取消" in html
+
+    # 2. 每月營收趨勢折線圖 (Chart.js)
+    assert "每月營收趨勢" in html
+    assert "monthlyRevenueChart" in html
+
+    # 3. 訂單狀態分布環圈圖
+    assert "訂單狀態分布" in html
+    assert "orderStatusChart" in html
+
+    # 4. 熱銷商品 Top 5
+    assert "熱銷商品 Top 5" in html
+
+    # 5. 客戶消費排行 Top 5
+    assert "客戶消費排行 Top 5" in html
+
+    # 6. 金額千分位與 Bootstrap 卡片排版
+    assert "NT$" in html
+    assert "col-12" in html
+    assert "chart.umd.min.js" in html
+
+
+def test_admin_dashboard_excludes_cancelled_orders(client):
+    """驗證狀態為「已取消」之訂單嚴格排除於累計營收與有效訂單統計"""
+    login_as_admin(client)
+
+    # 取得當前儀表板頁面
+    resp_before = client.get("/admin")
+    assert resp_before.status_code == 200
+
+    # 建立一張新訂單，並將其狀態設為「已取消」
+    cancel_order_id = f"SO{uuid.uuid4().int % 100000000}"
+    client.post("/orders/new", data={
+        "order_id": cancel_order_id,
+        "customer_id": "C001",
+        "product_id": ["P003"],  # 4500 元
+        "quantity": ["1"],
+    })
+
+    # 資料庫確認建立成功後，將其直接更新為「已取消」
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE orders SET status = '\u5df2\u53d6\u6d88' WHERE order_id = ?;", (cancel_order_id,))
+    conn.commit()
+
+    # 查詢儀表板計算的有效營收與總訂單數
+    cur.execute("""
+    SELECT COALESCE(SUM(oi.quantity * oi.unit_price), 0)
+    FROM order_item oi
+    JOIN orders o ON oi.order_id = o.order_id
+    WHERE o.status != '\u5df2\u53d6\u6d88';
+    """)
+    valid_revenue = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM orders WHERE status != '\u5df2\u53d6\u6d88';")
+    valid_order_count = cur.fetchone()[0]
+    conn.close()
+
+    # 再次存取 /admin，驗證畫面上計算的金額與有效訂單完全排除此筆已取消訂單
+    resp_after = client.get("/admin")
+    html_after = resp_after.data.decode("utf-8")
+    assert f"NT$ {valid_revenue:,.0f}" in html_after
+    assert f"{valid_order_count:,}" in html_after
+

@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+
+{% block title %}營運儀表板{% endblock %}
+
+{% block head %}
+<style>
+    /* 營運儀表板專屬微互動與視覺卡片 */
+    .dashboard-kpi-card {
+        border-radius: 14px;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .dashboard-kpi-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08) !important;
+    }
+    .kpi-icon-bubble {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.45rem;
+    }
+    .rank-badge {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 0.85rem;
+    }
+    .rank-1 { background-color: #fef08a; color: #854d0e; border: 1px solid #facc15; }
+    .rank-2 { background-color: #e2e8f0; color: #334155; border: 1px solid #cbd5e1; }
+    .rank-3 { background-color: #fed7aa; color: #9a3412; border: 1px solid #fdba74; }
+    .rank-other { background-color: #f1f5f9; color: #64748b; }
+    .chart-container {
+        position: relative;
+        height: 310px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- 頁首標題區 -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2">
+            <h2 class="fw-bold text-dark mb-0">營運儀表板</h2>
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2.5 py-1">
+                <i class="bi bi-shield-lock-fill me-1"></i>管理者專屬
+            </span>
+        </div>
+        <p class="text-muted small mb-0 mt-1">
+            即時彙整營運關鍵指標、營收趨勢分析與熱門排行 
+            <span class="text-danger fw-semibold">（※ 狀態為「已取消」之訂單嚴格排除計算）</span>
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('order_new') }}" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-circle me-1"></i>新增訂單
+        </a>
+        <a href="{{ url_for('orders') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-receipt me-1"></i>訂單列表
+        </a>
+    </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- 1. 上方四張 KPI 卡 (已取消訂單不列入計算，手機單欄 col-12 顯示) -->
+<!-- ================================================================= -->
+<div class="row g-3 mb-4">
+    <!-- KPI 1: 累計營收 -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card dashboard-kpi-card shadow-sm h-100 p-3 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted small fw-bold">累計營收</span>
+                <div class="kpi-icon-bubble bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-currency-dollar"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-1 mb-1">
+                <h3 class="fw-bold text-dark mb-0 font-monospace">NT$ {{ "{:,.0f}".format(total_revenue) }}</h3>
+            </div>
+            <div class="text-muted extra-small d-flex align-items-center justify-content-between pt-2 border-top mt-2" style="font-size: 0.78rem;">
+                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>有效營收核算</span>
+                <span class="badge bg-light text-muted border">排除已取消</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 2: 有效訂單數 -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card dashboard-kpi-card shadow-sm h-100 p-3 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted small fw-bold">有效訂單數</span>
+                <div class="kpi-icon-bubble bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-receipt-cutoff"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-1 mb-1">
+                <h3 class="fw-bold text-dark mb-0 font-monospace">{{ "{:,}".format(valid_order_count) }}</h3>
+                <span class="text-muted small">筆</span>
+            </div>
+            <div class="text-muted extra-small d-flex align-items-center justify-content-between pt-2 border-top mt-2" style="font-size: 0.78rem;">
+                <span>成立/處理/完成訂單</span>
+                <span class="badge bg-light text-muted border">排除已取消</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 3: 平均客單價 -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card dashboard-kpi-card shadow-sm h-100 p-3 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted small fw-bold">平均客單價 (AOV)</span>
+                <div class="kpi-icon-bubble bg-info bg-opacity-10 text-info">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-1 mb-1">
+                <h3 class="fw-bold text-dark mb-0 font-monospace">NT$ {{ "{:,.0f}".format(avg_order_value) }}</h3>
+            </div>
+            <div class="text-muted extra-small d-flex align-items-center justify-content-between pt-2 border-top mt-2" style="font-size: 0.78rem;">
+                <span>營收 / 有效訂單</span>
+                <span class="badge bg-light text-muted border">排除已取消</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 4: 客戶數 -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card dashboard-kpi-card shadow-sm h-100 p-3 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted small fw-bold">客戶數 (成交客戶)</span>
+                <div class="kpi-icon-bubble bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-baseline gap-1 mb-1">
+                <h3 class="fw-bold text-dark mb-0 font-monospace">{{ "{:,}".format(active_customer_count) }}</h3>
+                <span class="text-muted small">位</span>
+            </div>
+            <div class="text-muted extra-small d-flex align-items-center justify-content-between pt-2 border-top mt-2" style="font-size: 0.78rem;">
+                <span>總建檔客戶：<strong>{{ total_customer_count }}</strong> 位</span>
+                <span class="badge bg-light text-muted border">排除已取消</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- 2. 每月營收趨勢 (折線圖) & 3. 訂單狀態分布 (環圈圖) (手機單欄 col-12) -->
+<!-- ================================================================= -->
+<div class="row g-4 mb-4">
+    <!-- 折線圖：每月營收趨勢 -->
+    <div class="col-12 col-xl-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-graph-up text-primary me-2"></i>每月營收趨勢
+                    </h5>
+                    <span class="text-muted extra-small" style="font-size: 0.78rem;">依成立月份統計累計營收（單位：新台幣 NT$，排除已取消訂單）</span>
+                </div>
+                <span class="badge bg-primary bg-opacity-10 text-primary">折線圖 (Chart.js)</span>
+            </div>
+            <div class="card-body pt-1 pb-3">
+                <div class="chart-container">
+                    <canvas id="monthlyRevenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 環圈圖：訂單狀態分布 -->
+    <div class="col-12 col-xl-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-pie-chart text-info me-2"></i>訂單狀態分布
+                    </h5>
+                    <span class="text-muted extra-small" style="font-size: 0.78rem;">掌握各履約進度佔比與筆數分佈</span>
+                </div>
+                <span class="badge bg-info bg-opacity-10 text-info">環圈圖</span>
+            </div>
+            <div class="card-body pt-1 pb-3">
+                <div class="chart-container d-flex align-items-center justify-content-center">
+                    <canvas id="orderStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- 4. 熱銷商品 Top 5 & 5. 客戶消費排行 Top 5 (手機單欄 col-12) -->
+<!-- ================================================================= -->
+<div class="row g-4 mb-4">
+    <!-- 熱銷商品 Top 5 -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-trophy-fill text-warning me-2"></i>熱銷商品 Top 5
+                    </h5>
+                    <span class="text-muted extra-small" style="font-size: 0.78rem;">依累積售出數量排序（不含已取消之訂單）</span>
+                </div>
+                <a href="{{ url_for('products') }}" class="btn btn-sm btn-outline-secondary">商品管理</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted">
+                        <tr>
+                            <th class="ps-3" style="width: 60px;">排行</th>
+                            <th>商品名稱</th>
+                            <th class="text-center" style="width: 100px;">售出數量</th>
+                            <th class="text-end pe-3" style="width: 130px;">累積營收</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in top_products %}
+                        <tr>
+                            <td class="ps-3">
+                                <span class="rank-badge {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
+                                    {{ loop.index }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-semibold text-dark">{{ p.product_name }}</div>
+                                <span class="text-muted extra-small font-monospace" style="font-size: 0.75rem;">
+                                    {{ p.product_id }} · {{ p.category or '標準分類' }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-primary bg-opacity-10 text-primary fw-bold px-2 py-1">
+                                    {{ "{:,}".format(p.total_quantity) }} 件
+                                </span>
+                            </td>
+                            <td class="text-end pe-3 fw-bold text-dark font-monospace">
+                                NT$ {{ "{:,.0f}".format(p.total_revenue) }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">目前尚無有效銷售數據</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 客戶消費排行 Top 5 -->
+    <div class="col-12 col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0">
+                        <i class="bi bi-award-fill text-danger me-2"></i>客戶消費排行 Top 5
+                    </h5>
+                    <span class="text-muted extra-small" style="font-size: 0.78rem;">依有效消費總金額排序（不含已取消之訂單）</span>
+                </div>
+                <a href="{{ url_for('customers') }}" class="btn btn-sm btn-outline-secondary">客戶管理</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted">
+                        <tr>
+                            <th class="ps-3" style="width: 60px;">排行</th>
+                            <th>客戶名稱</th>
+                            <th class="text-center" style="width: 100px;">有效訂單數</th>
+                            <th class="text-end pe-3" style="width: 130px;">消費金額</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in top_customers %}
+                        <tr>
+                            <td class="ps-3">
+                                <span class="rank-badge {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}rank-other{% endif %}">
+                                    {{ loop.index }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-semibold text-dark">{{ c.customer_name }}</div>
+                                <span class="text-muted extra-small font-monospace" style="font-size: 0.75rem;">
+                                    {{ c.customer_id }} · {{ c.phone or '無電話紀錄' }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary fw-semibold px-2 py-1">
+                                    {{ "{:,}".format(c.order_count) }} 筆
+                                </span>
+                            </td>
+                            <td class="text-end pe-3 fw-bold text-success font-monospace">
+                                NT$ {{ "{:,.0f}".format(c.total_spent) }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">目前尚無有效消費紀錄</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 低庫存商品監控與提示區塊 -->
+{% if low_stock_products %}
+<div class="card border-warning border-opacity-50 shadow-sm mb-4">
+    <div class="card-header bg-warning bg-opacity-10 py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-warning-emphasis">
+            <i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>商品庫存預警 (庫存小於 30 件)
+        </h6>
+        <a href="{{ url_for('products') }}" class="btn btn-warning btn-sm text-dark">補貨維護</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th class="ps-3">編號</th>
+                        <th>品名</th>
+                        <th>目前庫存</th>
+                        <th class="text-end pe-3">牌價</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lp in low_stock_products %}
+                    <tr>
+                        <td class="ps-3 font-monospace text-muted">{{ lp.product_id }}</td>
+                        <td class="fw-semibold">{{ lp.name }}</td>
+                        <td>
+                            <span class="badge {% if lp.stock <= 10 %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                                {{ lp.stock }} 件
+                            </span>
+                        </td>
+                        <td class="text-end pe-3 font-monospace">NT$ {{ "{:,.0f}".format(lp.unit_price) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<!-- 載入 Chart.js 4.4.2 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // 貨幣千分位格式化工具
+    const currencyFormatter = new Intl.NumberFormat('zh-TW', {
+        style: 'currency',
+        currency: 'TWD',
+        maximumFractionDigits: 0
+    });
+
+    // 數字千分位格式化工具
+    const numberFormatter = new Intl.NumberFormat('zh-TW');
+
+    // 1. 每月營收趨勢 (折線圖)
+    const monthlyLabels = JSON.parse('{{ monthly_labels_json | safe }}');
+    const monthlyData = JSON.parse('{{ monthly_data_json | safe }}');
+    const monthlyCtx = document.getElementById('monthlyRevenueChart');
+
+    if (monthlyCtx) {
+        const lineCtx = monthlyCtx.getContext('2d');
+        // 建立漸層陰影背景
+        const gradientBg = lineCtx.createLinearGradient(0, 0, 0, 300);
+        gradientBg.addColorStop(0, 'rgba(59, 130, 246, 0.35)');
+        gradientBg.addColorStop(1, 'rgba(59, 130, 246, 0.01)');
+
+        new Chart(monthlyCtx, {
+            type: 'line',
+            data: {
+                labels: monthlyLabels,
+                datasets: [{
+                    label: '每月有效營收',
+                    data: monthlyData,
+                    borderColor: '#2563eb',
+                    backgroundColor: gradientBg,
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#1d4ed8',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        padding: 12,
+                        cornerRadius: 8,
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 14 },
+                        callbacks: {
+                            label: function (context) {
+                                return ' 營收：' + currencyFormatter.format(context.raw);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 12, family: 'monospace' },
+                            color: '#64748b'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(226, 232, 240, 0.8)' },
+                        ticks: {
+                            font: { size: 12 },
+                            color: '#64748b',
+                            callback: function (value) {
+                                return 'NT$ ' + numberFormatter.format(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. 訂單狀態分布 (環圈圖)
+    const statusLabels = JSON.parse('{{ status_labels_json | safe }}');
+    const statusData = JSON.parse('{{ status_data_json | safe }}');
+    const statusCtx = document.getElementById('orderStatusChart');
+
+    if (statusCtx) {
+        // 色系配置：處理中(琥珀金)、已出貨(晴空藍)、已完成(翡翠綠)、已取消(冷板岩灰)
+        const statusColors = ['#f59e0b', '#0ea5e9', '#10b981', '#94a3b8'];
+        const totalCount = statusData.reduce((acc, cur) => acc + cur, 0);
+
+        new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: statusLabels,
+                datasets: [{
+                    data: statusData,
+                    backgroundColor: statusColors,
+                    hoverBackgroundColor: ['#d97706', '#0284c7', '#059669', '#64748b'],
+                    borderWidth: 3,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '68%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 18,
+                            font: { size: 13, weight: 'bold' },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        padding: 12,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function (context) {
+                                const val = context.raw || 0;
+                                const pct = totalCount > 0 ? ((val / totalCount) * 100).toFixed(1) : 0;
+                                return ` ${context.label}: ${val} 筆 (${pct}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
