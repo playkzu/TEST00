@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}找不到頁面{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center py-5">
+    <div class="col-12 col-md-6 text-center">
+        <div class="display-1 fw-bold text-muted mb-2">404</div>
+        <h4 class="fw-bold text-dark mb-3">查無相關資訊</h4>
+        <p class="text-muted mb-4">{{ message or "您所要求的頁面或訂單不存在，請確認編號是否正確。" }}</p>
+        <a href="{{ url_for('orders') if session.get('logged_in') else url_for('login') }}" class="btn btn-primary">
+            <i class="bi bi-house-door me-1"></i>返回系統首頁
+        </a>
+    </div>
+</div>
+{% endblock %}

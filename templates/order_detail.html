@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}出貨單 {{ order.order_id }}{% endblock %}
+
+{% block head %}
+<style>
+    .invoice-card {
+        background-color: #fff;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        padding: 2.5rem;
+    }
+    .invoice-header {
+        border-bottom: 2px solid #edf2f7;
+        padding-bottom: 1.5rem;
+    }
+    .qr-container {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+        display: inline-block;
+    }
+    @media print {
+        .invoice-card {
+            box-shadow: none !important;
+            padding: 0 !important;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-10 col-xl-9">
+        
+        <!-- 頂部操作按鈕 (列印與返回) -->
+        <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+            <a href="{{ url_for('orders') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>返回訂單列表
+            </a>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-primary btn-sm shadow-sm" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i>列印出貨單
+                </button>
+            </div>
+        </div>
+
+        <!-- 正式出貨單主體 -->
+        <div class="invoice-card border">
+            <!-- 出貨單抬頭與訂單摘要 -->
+            <div class="invoice-header d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bi bi-box-seam-fill text-primary fs-3"></i>
+                        <h3 class="fw-bold text-dark mb-0">銷貨出貨單 (Delivery Order)</h3>
+                    </div>
+                    <span class="text-muted small">專屬驗證頁面：<code>/order/{{ order.order_id }}</code></span>
+                </div>
+                <div class="text-md-end">
+                    <div class="badge badge-status badge-status-{{ order.status }} fs-6 mb-2">
+                        訂單狀態：{{ order.status }}
+                    </div>
+                    <div class="text-muted small">
+                        <strong>出貨單號：</strong><span class="text-primary fw-bold font-monospace">{{ order.order_id }}</span><br>
+                        <strong>下單時間：</strong>{{ order.order_date }}<br>
+                        <strong>負責業務：</strong>{{ order.sales_rep or '線上系統' }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 客戶與收件資訊 -->
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-7">
+                    <div class="p-3 bg-light rounded-3 h-100 border">
+                        <h6 class="fw-bold text-primary mb-2">
+                            <i class="bi bi-person-fill me-1"></i>收件客戶資訊
+                        </h6>
+                        <table class="table table-sm table-borderless mb-0 small">
+                            <tr>
+                                <th style="width: 80px;" class="text-muted ps-0">客戶姓名：</th>
+                                <td class="fw-bold">{{ order.customer_name }} ({{ order.customer_id }})</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted ps-0">聯絡電話：</th>
+                                <td>{{ order.customer_phone or '未填寫' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted ps-0">配送地址：</th>
+                                <td>{{ order.customer_address or '未填寫' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 專屬出貨單 QR Code -->
+                <div class="col-12 col-md-5 text-center text-md-end">
+                    <div class="qr-container">
+                        <img src="data:image/png;base64,{{ qr_base64 }}" alt="出貨單 QR Code" class="img-fluid" style="width: 130px; height: 130px;">
+                        <div class="mt-2 text-muted extra-small" style="font-size: 0.75rem;">
+                            <i class="bi bi-qr-code-scan me-1"></i>掃描驗證本出貨單
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 出貨商品明細表格 -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-dark mb-3">
+                    <i class="bi bi-list-check me-1 text-primary"></i>出貨商品品項明細 (共 {{ items|length }} 項)
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0">
+                        <thead class="table-light small text-center text-muted">
+                            <tr>
+                                <th style="width: 60px;">序號</th>
+                                <th>商品編號</th>
+                                <th>商品品名</th>
+                                <th>分類</th>
+                                <th style="width: 90px;">出貨數量</th>
+                                <th class="text-end" style="width: 140px;">下單單價</th>
+                                <th class="text-end" style="width: 140px;">目前牌價 (對比)</th>
+                                <th class="text-end" style="width: 130px;">小計金額</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td class="text-center text-muted small">{{ loop.index }}</td>
+                                <td class="font-monospace fw-semibold">{{ item.product_id }}</td>
+                                <td class="fw-bold text-dark">{{ item.product_name }}</td>
+                                <td class="text-muted small">{{ item.category }}</td>
+                                <td class="text-center fw-bold text-primary">{{ item.quantity }}</td>
+                                <td class="text-end fw-bold text-dark">
+                                    NT$ {{ "{:,.0f}".format(item.unit_price) }}
+                                </td>
+                                <td class="text-end small">
+                                    {% if item.unit_price != item.current_catalog_price %}
+                                        <span class="text-danger fw-semibold" title="商品牌價已變更，但歷史訂單單價凍結保存不受影響">
+                                            NT$ {{ "{:,.0f}".format(item.current_catalog_price) }}
+                                        </span>
+                                        <span class="badge bg-warning text-dark extra-small d-block" style="font-size: 0.7rem;">牌價已改</span>
+                                    {% else %}
+                                        <span class="text-muted">NT$ {{ "{:,.0f}".format(item.current_catalog_price) }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold text-dark">
+                                    NT$ {{ "{:,.0f}".format(item.subtotal) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="4" class="text-end fw-bold">品項合計：</td>
+                                <td class="text-center fw-bold text-primary">{{ total_qty }} 件</td>
+                                <td colspan="2" class="text-end fw-bold fs-6">應收總額：</td>
+                                <td class="text-end fw-bold text-danger fs-5">
+                                    NT$ {{ "{:,.0f}".format(total_amount) }}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 單據說明與下單單價凍結提示 -->
+            <div class="p-3 bg-light rounded-3 border small text-muted">
+                <div class="d-flex align-items-center gap-2 mb-1 text-primary fw-semibold">
+                    <i class="bi bi-shield-check"></i> 系統完整性機制提示：
+                </div>
+                <ul class="mb-0 ps-3">
+                    <li><strong>下單當時單價保存保證</strong>：本表「下單單價」即為 <code>order_item.unit_price</code> 之歷史快照，商品後續調整定價完全不影響本單結算金額。</li>
+                    <li><strong>出貨核對條碼</strong>：可直接使用手機相機掃描右上方 QR Code 進行現場核單驗證。</li>
+                </ul>
+            </div>
+
+            <!-- 簽收欄位 (方便列印後簽名) -->
+            <div class="row g-4 mt-4 pt-3 border-top text-center text-muted small">
+                <div class="col-4">
+                    <div class="border-bottom pb-4 mb-1"></div>
+                    <span>出貨倉管簽核</span>
+                </div>
+                <div class="col-4">
+                    <div class="border-bottom pb-4 mb-1"></div>
+                    <span>配送司機簽核</span>
+                </div>
+                <div class="col-4">
+                    <div class="border-bottom pb-4 mb-1"></div>
+                    <span>客戶驗收簽名</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
